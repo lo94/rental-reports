@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JesseHouse – 17 listings</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  .map-wrap { padding:20px 32px 0; }
+  .map-bar { display:flex; align-items:center; gap:14px; margin-bottom:10px; flex-wrap:wrap; }
+  .map-bar h2 { margin:0; font-size:21px; }
+  .toggle { display:inline-flex; border:1px solid #d1d5db; border-radius:8px; overflow:hidden; }
+  .toggle button { border:0; background:#fff; padding:7px 16px; font-size:14px; cursor:pointer; }
+  .toggle button.on { background:var(--accent); color:#fff; }
+  .legend { font-size:13px; color:var(--muted); display:flex; gap:14px; align-items:center; }
+  .dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:4px; vertical-align:-1px; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.3); }
+  #map { height:460px; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .pop { width:220px; font-family:inherit; }
+  .pop img { width:100%; height:130px; object-fit:cover; border-radius:6px; display:block; margin-bottom:6px; }
+  .pop b { font-size:16px; }
+  .pop .new { color:var(--new); font-weight:700; font-size:11px; margin-left:6px; }
+  .pop a { color:var(--accent); font-weight:600; }
+  .card.flash { outline:3px solid var(--new); outline-offset:2px; }
+</style>
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --ink:#1d2330; --muted:#6b7280; --accent:#0b5d66; --new:#d9480f; --house:#2b8a3e; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--accent); color:#fff; padding:24px 32px; }
+  header h1 { margin:0 0 6px; font-size:26px; }
+  header .sub { opacity:.85; font-size:14px; }
+  .stats { display:flex; gap:12px; flex-wrap:wrap; margin-top:16px; }
+  .stat { background:rgba(255,255,255,.14); border-radius:10px; padding:10px 16px; min-width:120px; }
+  .stat b { display:block; font-size:22px; }
+  .stat span { font-size:12px; text-transform:uppercase; letter-spacing:.05em; opacity:.85; }
+  .chips { margin-top:14px; }
+  .chip { display:inline-block; background:#fff; color:var(--accent); border-radius:999px; padding:3px 12px; margin:0 6px 6px 0; font-size:13px; font-weight:600; }
+  .controls { position:sticky; top:0; z-index:5; background:#fff; border-bottom:1px solid #e5e7eb; padding:12px 32px;
+               display:flex; gap:16px; align-items:center; flex-wrap:wrap; box-shadow:0 2px 6px rgba(0,0,0,.05); }
+  .controls input[type=search] { padding:8px 12px; border:1px solid #d1d5db; border-radius:8px; min-width:260px; font-size:14px; }
+  .controls select, .controls input[type=number] { padding:7px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; }
+  .controls input[type=number] { width:110px; }
+  .controls label { font-size:14px; display:flex; align-items:center; gap:6px; cursor:pointer; }
+  main { padding:8px 32px 48px; }
+  section h2 { font-size:21px; margin:28px 0 14px; padding-bottom:8px; border-bottom:2px solid #d1d5db; display:flex; align-items:baseline; gap:10px; }
+  section.new-section h2 { border-color:var(--new); color:var(--new); }
+  section h2 .count { font-size:14px; color:var(--muted); font-weight:400; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:20px; }
+  .card { background:var(--card); border-radius:14px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.08); display:flex; flex-direction:column; transition:transform .12s, box-shadow .12s; }
+  .card:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,.12); }
+  .photo { position:relative; display:block; aspect-ratio:4/3; background:#e5e7eb; }
+  .photo img { width:100%; height:100%; object-fit:cover; display:block; }
+  .photo.noimg::after { content:"No photo"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:14px; }
+  .badges { position:absolute; top:10px; left:10px; display:flex; gap:6px; }
+  .badge { font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; color:#fff; letter-spacing:.04em; }
+  .badge.new { background:var(--new); }
+  .badge.house { background:var(--house); }
+  .body { padding:14px 16px 16px; display:flex; flex-direction:column; gap:6px; flex:1; }
+  .rent { font-size:22px; font-weight:700; }
+  .rent span { font-size:13px; font-weight:400; color:var(--muted); }
+  .facts { font-size:14px; color:#374151; }
+  .address a { color:var(--ink); text-decoration:none; font-weight:600; font-size:14px; }
+  .address a:hover { text-decoration:underline; }
+  .meta { font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:2px; }
+  .meta b { color:#4b5563; font-weight:600; }
+  .btn { margin-top:auto; align-self:flex-start; background:var(--accent); color:#fff; text-decoration:none; padding:8px 14px; border-radius:8px; font-size:14px; font-weight:600; }
+  .btn:hover { filter:brightness(1.1); }
+  .empty { grid-column:1/-1; text-align:center; color:var(--muted); padding:60px 0; }
+</style>
+</head>
+<body>
+<div style="position:sticky;top:0;z-index:9999;background:#fff3cd;color:#664d03;border-bottom:1px solid #ffe69c;padding:10px 16px;font:14px -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">Report from <b>Tue Oct 6, 1:53 AM</b>. "New" means new since the check before this one. <a href="../../">View the latest report</a> · <a href="../">All reports</a></div><header>
+  <h1>JesseHouse – Rental Search Report</h1>
+  <div class="sub">Generated Tuesday, October 06, 2026 at 08:53 AM · 11 property managers checked via direct API/HTTP</div>
+  <div class="stats">
+    <div class="stat"><b>17</b><span>Matches</span></div>
+    <div class="stat"><b>0</b><span>New since last run</span></div>
+    <div class="stat"><b>17</b><span>No unit # (likely houses)</span></div>
+    <div class="stat"><b>$1,395 – $2,195</b><span>Rent range</span></div>
+  </div>
+  <div class="chips"><span class="chip">Portland, OR</span><span class="chip">Rent ≥ $1,300</span><span class="chip">Rent ≤ $2,200</span><span class="chip">2+ beds</span><span class="chip">1+ baths</span><span class="chip">Cats allowed</span><span class="chip">Houses only (no unit #)</span></div>
+</header>
+
+<div class="controls">
+  <input type="search" id="q" placeholder="Search address, company, pet policy…">
+  <select id="sort">
+    <option value="rent-asc">Rent: low → high</option>
+    <option value="rent-desc">Rent: high → low</option>
+    <option value="beds-desc">Most bedrooms</option>
+  </select>
+  <input type="number" id="maxRent" placeholder="Max rent" step="50" min="0">
+  <select id="minBeds">
+    <option value="0">Any beds</option>
+    <option value="1">1+ beds</option>
+    <option value="2">2+ beds</option>
+    <option value="3">3+ beds</option>
+  </select>
+  <label><input type="checkbox" id="houseOnly"> No unit # only</label>
+</div>
+
+<div class="map-wrap">
+  <div class="map-bar">
+    <h2>Map</h2>
+    <div class="toggle">
+      <button id="mapNew" type="button">New (0)</button>
+      <button id="mapAll" type="button" class="on">All (17)</button>
+    </div>
+    <span class="legend">
+      <span><span class="dot" style="background:#d9480f"></span>New</span>
+      <span><span class="dot" style="background:#0b5d66"></span>Other</span>
+      
+    </span>
+  </div>
+  <div id="map"></div>
+</div>
+
+<main>
+  <section class="new-section">
+    <h2>New Since Last Check <span class="count" id="count-new"></span></h2>
+    <div class="grid" id="grid-new">
+<div class="empty">No new listings since the last check.</div>
+    </div>
+  </section>
+  <section>
+    <h2>All Listings <span class="count" id="count-all"></span></h2>
+    <div class="grid" id="grid-all">
+
+    <article class="card" id="ld9fb7823bf" data-rent="1395" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="3809 se 164th avenue, portland, or 97236 rentportlandhomes cats allowed, dogs allowed">
+      <a class="photo " href="https://rentportlandhomesprofessionals.appfolio.com/listings/detail/ab4393d0-b617-465d-a038-71f4cf73cebf" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/rentportlandhomesprofessionals/images/377236b4-f94a-466d-97bd-40d7cea581e6/medium.jpg" alt="3809 SE 164th Avenue, Portland, OR 97236" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,395<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 900 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=3809+SE+164th+Avenue%2C+Portland%2C+OR+97236" target="_blank" rel="noopener">3809 SE 164th Avenue, Portland, OR 97236</a></div>
+        <div class="meta">
+          <div><b>Company:</b> RentPortlandHomes</div>
+          <div><b>Available:</b> 10/15/26</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://rentportlandhomesprofessionals.appfolio.com/listings/detail/ab4393d0-b617-465d-a038-71f4cf73cebf" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="lac958643fe" data-rent="1400" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="1503 sw evans street, portland, or 97219 ppirentals cats allowed, small dogs allowed">
+      <a class="photo " href="https://performance.appfolio.com/listings/detail/ca4f034f-cb98-4195-984e-e5fe80828400" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/performance/images/71e9ee65-40cc-46c9-8541-f6ae3c80d1bc/medium.jpg" alt="1503 SW Evans Street, Portland, OR 97219" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,400<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 850 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=1503+SW+Evans+Street%2C+Portland%2C+OR+97219" target="_blank" rel="noopener">1503 SW Evans Street, Portland, OR 97219</a></div>
+        <div class="meta">
+          <div><b>Company:</b> PPIRentals</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://performance.appfolio.com/listings/detail/ca4f034f-cb98-4195-984e-e5fe80828400" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l20aeab0d23" data-rent="1625" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="8123 se morrison st., portland, or 97215 reliance cats allowed, dogs allowed">
+      <a class="photo " href="https://reliance.appfolio.com/listings/detail/973d1091-f061-4261-97dd-0651bdd34b2a" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/reliance/images/6ab8ae89-7b8a-4d1c-910a-0d6275a77425/medium.jpg" alt="8123 SE Morrison St., Portland, OR 97215" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,625<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 807 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=8123+SE+Morrison+St.%2C+Portland%2C+OR+97215" target="_blank" rel="noopener">8123 SE Morrison St., Portland, OR 97215</a></div>
+        <div class="meta">
+          <div><b>Company:</b> Reliance</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://reliance.appfolio.com/listings/detail/973d1091-f061-4261-97dd-0651bdd34b2a" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="lc3beff33b7" data-rent="1695" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="5948 ne 30th ave, portland, or 97211 rmspdx cats allowed, dogs not allowed">
+      <a class="photo " href="https://rmspdx.appfolio.com/listings/detail/643c071b-309d-41fb-89f6-eb01e50eb881" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/rmspdx/images/fa728cb5-13df-4e21-8fea-08cf1620c012/medium.jpg" alt="5948 NE 30th Ave, Portland, OR 97211" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,695<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 750 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=5948+NE+30th+Ave%2C+Portland%2C+OR+97211" target="_blank" rel="noopener">5948 NE 30th Ave, Portland, OR 97211</a></div>
+        <div class="meta">
+          <div><b>Company:</b> RMSPDX</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs not allowed</div>
+        </div>
+        <a class="btn" href="https://rmspdx.appfolio.com/listings/detail/643c071b-309d-41fb-89f6-eb01e50eb881" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l4bc7bb55b1" data-rent="1699" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="5853 sw oleson road , portland, or 97225 propmhomes cats allowed, dogs allowed">
+      <a class="photo " href="https://propmhomes.appfolio.com/listings/detail/791e46e9-47ce-48b0-9f79-82138e6576f8" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/propmhomes/images/99f35fd1-4d24-41c8-92b0-589ca670ffc2/medium.jpg" alt="5853 SW Oleson Road , Portland, OR 97225" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,699<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 750 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=5853+SW+Oleson+Road+%2C+Portland%2C+OR+97225" target="_blank" rel="noopener">5853 SW Oleson Road , Portland, OR 97225</a></div>
+        <div class="meta">
+          <div><b>Company:</b> PropMHomes</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://propmhomes.appfolio.com/listings/detail/791e46e9-47ce-48b0-9f79-82138e6576f8" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l3dfb2444e9" data-rent="1700" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="2423 se taylor st., portland, or 97214 bluestoneandhockley cats allowed, small dogs allowed">
+      <a class="photo " href="https://bluestone.appfolio.com/listings/detail/7c94efaa-00e1-4ae2-87fb-a46e775d4c8a" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/criteriaproperties/images/edc782e3-b519-4fb5-a87e-ac7c5c4a74de/medium.jpg" alt="2423 SE Taylor St., Portland, OR 97214" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,700<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 700 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=2423+SE+Taylor+St.%2C+Portland%2C+OR+97214" target="_blank" rel="noopener">2423 SE Taylor St., Portland, OR 97214</a></div>
+        <div class="meta">
+          <div><b>Company:</b> BluestoneAndHockley</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://bluestone.appfolio.com/listings/detail/7c94efaa-00e1-4ae2-87fb-a46e775d4c8a" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="lb47eb7f712" data-rent="1750" data-beds="2" data-baths="2"
+             data-new="0" data-house="1"
+             data-text="6061 sw beaverton-hillsdale, portland, or 97221 bluestoneandhockley cats allowed, dogs not allowed">
+      <a class="photo " href="https://bluestone.appfolio.com/listings/detail/e870cdc3-7806-4aea-92de-9ba7dbf8d200" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/criteriaproperties/images/ab54653f-6e2c-43b2-87b3-b2bf64233008/medium.jpg" alt="6061 SW Beaverton-Hillsdale, Portland, OR 97221" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,750<span>/mo</span></div>
+        <div class="facts">2 bd · 2 ba · 900 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=6061+SW+Beaverton-Hillsdale%2C+Portland%2C+OR+97221" target="_blank" rel="noopener">6061 SW Beaverton-Hillsdale, Portland, OR 97221</a></div>
+        <div class="meta">
+          <div><b>Company:</b> BluestoneAndHockley</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs not allowed</div>
+        </div>
+        <a class="btn" href="https://bluestone.appfolio.com/listings/detail/e870cdc3-7806-4aea-92de-9ba7dbf8d200" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="lbae74eb7c8" data-rent="1945" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="68 ne monroe ave., portland, or 97212 gridpropertymanagement cats allowed, small dogs allowed">
+      <a class="photo " href="https://gridpm.appfolio.com/listings/detail/a97d16a5-e86c-44ca-9115-f52889c381e1" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/gridpm/images/9a80188d-d335-4316-b602-2872eda18557/medium.jpg" alt="68 NE Monroe Ave., Portland, OR 97212" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,945<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 720 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=68+NE+Monroe+Ave.%2C+Portland%2C+OR+97212" target="_blank" rel="noopener">68 NE Monroe Ave., Portland, OR 97212</a></div>
+        <div class="meta">
+          <div><b>Company:</b> GridPropertyManagement</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://gridpm.appfolio.com/listings/detail/a97d16a5-e86c-44ca-9115-f52889c381e1" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l19e44b8f16" data-rent="1950" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="2836 se 50th avenue, portland, or 97206 rentportlandhomes cats allowed, small dogs allowed">
+      <a class="photo " href="https://rentportlandhomesdarlaandrewsoffice.appfolio.com/listings/detail/ec25afd1-5880-41d9-8ada-fbb473bee575" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/rentportlandhomesdarlaandrewsoffice/images/84b3ef95-4827-4351-8c1d-7a01bec8cc2b/medium.jpg" alt="2836 SE 50th Avenue, Portland, OR 97206" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,950<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 800 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=2836+SE+50th+Avenue%2C+Portland%2C+OR+97206" target="_blank" rel="noopener">2836 SE 50th Avenue, Portland, OR 97206</a></div>
+        <div class="meta">
+          <div><b>Company:</b> RentPortlandHomes</div>
+          <div><b>Available:</b> 10/15/26</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://rentportlandhomesdarlaandrewsoffice.appfolio.com/listings/detail/ec25afd1-5880-41d9-8ada-fbb473bee575" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l81ab42a979" data-rent="1970" data-beds="2" data-baths="2"
+             data-new="0" data-house="1"
+             data-text="16980 ne halsey street , portland, or 97230 onyx cats allowed, small dogs allowed">
+      <a class="photo " href="https://onyx.appfolio.com/listings/detail/27c1f720-a117-4b18-8b0e-2720d076acbb" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/onyx/images/1089189a-0376-4ccd-aa09-1fd05cdb0746/medium.jpg" alt="16980 NE Halsey Street , Portland, OR 97230" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,970<span>/mo</span></div>
+        <div class="facts">2 bd · 2 ba · 1,949 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=16980+NE+Halsey+Street+%2C+Portland%2C+OR+97230" target="_blank" rel="noopener">16980 NE Halsey Street , Portland, OR 97230</a></div>
+        <div class="meta">
+          <div><b>Company:</b> Onyx</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://onyx.appfolio.com/listings/detail/27c1f720-a117-4b18-8b0e-2720d076acbb" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="la85810f5c2" data-rent="1995" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="1501 sw bertha blvd , portland, or 97219 corerealtors cats allowed, small dogs allowed">
+      <a class="photo " href="https://corerealtors.appfolio.com/listings/detail/a7c6a084-732a-477b-b045-a6ae658dd68d" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/corerealtors/images/e51e5eb4-21b7-4b67-a3b9-a6d1b1ae2323/medium.jpg" alt="1501 SW Bertha Blvd , Portland, OR 97219" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,995<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 1,300 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=1501+SW+Bertha+Blvd+%2C+Portland%2C+OR+97219" target="_blank" rel="noopener">1501 SW Bertha Blvd , Portland, OR 97219</a></div>
+        <div class="meta">
+          <div><b>Company:</b> CoreRealtors</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://corerealtors.appfolio.com/listings/detail/a7c6a084-732a-477b-b045-a6ae658dd68d" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l52ef55c4a0" data-rent="2099" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="5855 sw oleson road , portland, or 97225 propmhomes cats allowed, dogs allowed">
+      <a class="photo " href="https://propmhomes.appfolio.com/listings/detail/9b1ca427-364b-4d20-809a-27568954822e" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/propmhomes/images/cd1376eb-dede-4d0e-8b3c-0b35353503c8/medium.jpg" alt="5855 SW Oleson Road , Portland, OR 97225" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$2,099<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 750 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=5855+SW+Oleson+Road+%2C+Portland%2C+OR+97225" target="_blank" rel="noopener">5855 SW Oleson Road , Portland, OR 97225</a></div>
+        <div class="meta">
+          <div><b>Company:</b> PropMHomes</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://propmhomes.appfolio.com/listings/detail/9b1ca427-364b-4d20-809a-27568954822e" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l5c60ce781c" data-rent="2145" data-beds="4" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="2811 se 125th ave, portland, or 97236 peakassetmanagement cats allowed, dogs allowed">
+      <a class="photo " href="https://peakam.appfolio.com/listings/detail/2e539c00-4cae-46a8-8289-c4fd36662286" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/peakam/images/5315455f-40a5-4a22-9a90-25dfa0edf5f3/medium.jpg" alt="2811 SE 125th Ave, Portland, OR 97236" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$2,145<span>/mo</span></div>
+        <div class="facts">4 bd · 1 ba · 1,115 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=2811+SE+125th+Ave%2C+Portland%2C+OR+97236" target="_blank" rel="noopener">2811 SE 125th Ave, Portland, OR 97236</a></div>
+        <div class="meta">
+          <div><b>Company:</b> PeakAssetManagement</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://peakam.appfolio.com/listings/detail/2e539c00-4cae-46a8-8289-c4fd36662286" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l3692ffa803" data-rent="2175" data-beds="3" data-baths="2.5"
+             data-new="0" data-house="1"
+             data-text="16970 ne halsey street , portland, or 97230 onyx cats allowed, small dogs allowed">
+      <a class="photo " href="https://onyx.appfolio.com/listings/detail/3e00bff2-0b43-41f6-8f03-d13cf25d05d7" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/onyx/images/596a3f0c-cc11-4eee-9eba-9035818bec3e/medium.jpg" alt="16970 NE Halsey Street , Portland, OR 97230" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$2,175<span>/mo</span></div>
+        <div class="facts">3 bd · 2.5 ba · 1,500 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=16970+NE+Halsey+Street+%2C+Portland%2C+OR+97230" target="_blank" rel="noopener">16970 NE Halsey Street , Portland, OR 97230</a></div>
+        <div class="meta">
+          <div><b>Company:</b> Onyx</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://onyx.appfolio.com/listings/detail/3e00bff2-0b43-41f6-8f03-d13cf25d05d7" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="lc66ac63435" data-rent="2175" data-beds="3" data-baths="2.5"
+             data-new="0" data-house="1"
+             data-text="16962 ne halsey street, portland, or 97230 onyx cats allowed, small dogs allowed">
+      <a class="photo " href="https://onyx.appfolio.com/listings/detail/42c015b6-f7b8-4433-bc26-a9e7af12256f" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/onyx/images/d81a94b8-2c43-4aad-9931-c33baff0f8dc/medium.jpg" alt="16962 NE Halsey Street, Portland, OR 97230" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$2,175<span>/mo</span></div>
+        <div class="facts">3 bd · 2.5 ba · 1,500 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=16962+NE+Halsey+Street%2C+Portland%2C+OR+97230" target="_blank" rel="noopener">16962 NE Halsey Street, Portland, OR 97230</a></div>
+        <div class="meta">
+          <div><b>Company:</b> Onyx</div>
+          <div><b>Available:</b> 10/9/26</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://onyx.appfolio.com/listings/detail/42c015b6-f7b8-4433-bc26-a9e7af12256f" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l7425a75759" data-rent="2195" data-beds="3" data-baths="2.5"
+             data-new="0" data-house="1"
+             data-text="17227 se pine street, portland, or 97233 rentportlandhomes cats allowed, dogs allowed">
+      <a class="photo " href="https://rentportlandhomesdarlaandrewsoffice.appfolio.com/listings/detail/d0299efe-3bd4-4ac8-9f96-fcd54ea27d8a" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/rentportlandhomesdarlaandrewsoffice/images/2d51967f-3fcc-45dc-8386-5ce4357a1f89/medium.jpg" alt="17227 SE Pine Street, Portland, OR 97233" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$2,195<span>/mo</span></div>
+        <div class="facts">3 bd · 2.5 ba · 1,236 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=17227+SE+Pine+Street%2C+Portland%2C+OR+97233" target="_blank" rel="noopener">17227 SE Pine Street, Portland, OR 97233</a></div>
+        <div class="meta">
+          <div><b>Company:</b> RentPortlandHomes</div>
+          <div><b>Available:</b> 10/29/26</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://rentportlandhomesdarlaandrewsoffice.appfolio.com/listings/detail/d0299efe-3bd4-4ac8-9f96-fcd54ea27d8a" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l5e0a6b1cdb" data-rent="2195" data-beds="3" data-baths="2.5"
+             data-new="0" data-house="1"
+             data-text="5254 se 73rd ave, portland, or 97206 gordonproperties cats allowed, small dogs allowed">
+      <a class="photo " href="https://gordonproperties.appfolio.com/listings/detail/23110698-b9cf-477a-b308-8df04d61dd58" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/gordonproperties/images/e2f65247-921c-4253-889e-e689d869b870/medium.jpg" alt="5254 SE 73rd Ave, Portland, OR 97206" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$2,195<span>/mo</span></div>
+        <div class="facts">3 bd · 2.5 ba · 1,408 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=5254+SE+73rd+Ave%2C+Portland%2C+OR+97206" target="_blank" rel="noopener">5254 SE 73rd Ave, Portland, OR 97206</a></div>
+        <div class="meta">
+          <div><b>Company:</b> GordonProperties</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://gordonproperties.appfolio.com/listings/detail/23110698-b9cf-477a-b308-8df04d61dd58" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+    </div>
+  </section>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const grids = [...document.querySelectorAll('.grid')];
+  function apply() {
+    const q = $('q').value.trim().toLowerCase();
+    const maxRent = parseFloat($('maxRent').value) || Infinity;
+    const minBeds = parseFloat($('minBeds').value) || 0;
+    const houseOnly = $('houseOnly').checked;
+    grids.forEach(g => {
+      const cards = [...g.querySelectorAll('.card')];
+      let shown = 0;
+      cards.forEach(c => {
+        const d = c.dataset;
+        const ok = (!q || d.text.includes(q)) && (+d.rent <= maxRent) && (+d.beds >= minBeds)
+                && (!houseOnly || d.house === '1');
+        c.style.display = ok ? '' : 'none';
+        if (ok) shown++;
+      });
+      $('count-' + g.id.slice(5)).textContent =
+        cards.length ? (shown === cards.length ? `(${shown})` : `(showing ${shown} of ${cards.length})`) : '(0)';
+    });
+  }
+  function sort() {
+    const key = {
+      'rent-asc':  (a, b) => (+a.dataset.rent || 1e9) - (+b.dataset.rent || 1e9),
+      'rent-desc': (a, b) => +b.dataset.rent - +a.dataset.rent,
+      'beds-desc': (a, b) => +b.dataset.beds - +a.dataset.beds || +a.dataset.rent - +b.dataset.rent,
+    }[$('sort').value];
+    grids.forEach(g => [...g.querySelectorAll('.card')].sort(key).forEach(c => g.appendChild(c)));
+  }
+  ['q','maxRent','minBeds','houseOnly'].forEach(id => $(id).addEventListener('input', apply));
+  ['q','maxRent','minBeds','houseOnly'].forEach(id => $(id).addEventListener('input', () => drawMap(false)));
+
+  // ---- Map ----
+  const POINTS = [{"id": "ld9fb7823bf", "lat": 45.4949943, "lng": -122.4953971, "rent": 1395.0, "beds": 2.0, "cost": "$1,395", "bb": "2 bd / 1 ba", "addr": "3809 SE 164th Avenue, Portland, OR 97236", "img": "https://images.cdn.appfolio.com/rentportlandhomesprofessionals/images/377236b4-f94a-466d-97bd-40d7cea581e6/medium.jpg", "url": "https://rentportlandhomesprofessionals.appfolio.com/listings/detail/ab4393d0-b617-465d-a038-71f4cf73cebf", "isNew": false}, {"id": "lac958643fe", "lat": 45.4671574, "lng": -122.6938343, "rent": 1400.0, "beds": 2.0, "cost": "$1,400", "bb": "2 bd / 1 ba", "addr": "1503 SW Evans Street, Portland, OR 97219", "img": "https://images.cdn.appfolio.com/performance/images/71e9ee65-40cc-46c9-8541-f6ae3c80d1bc/medium.jpg", "url": "https://performance.appfolio.com/listings/detail/ca4f034f-cb98-4195-984e-e5fe80828400", "isNew": false}, {"id": "l20aeab0d23", "lat": 45.5171441, "lng": -122.579705, "rent": 1625.0, "beds": 2.0, "cost": "$1,625", "bb": "2 bd / 1 ba", "addr": "8123 SE Morrison St., Portland, OR 97215", "img": "https://images.cdn.appfolio.com/reliance/images/6ab8ae89-7b8a-4d1c-910a-0d6275a77425/medium.jpg", "url": "https://reliance.appfolio.com/listings/detail/973d1091-f061-4261-97dd-0651bdd34b2a", "isNew": false}, {"id": "lc3beff33b7", "lat": 45.5658669, "lng": -122.6346149, "rent": 1695.0, "beds": 2.0, "cost": "$1,695", "bb": "2 bd / 1 ba", "addr": "5948 NE 30th Ave, Portland, OR 97211", "img": "https://images.cdn.appfolio.com/rmspdx/images/fa728cb5-13df-4e21-8fea-08cf1620c012/medium.jpg", "url": "https://rmspdx.appfolio.com/listings/detail/643c071b-309d-41fb-89f6-eb01e50eb881", "isNew": false}, {"id": "l4bc7bb55b1", "lat": 45.4778687, "lng": -122.7473859, "rent": 1699.0, "beds": 2.0, "cost": "$1,699", "bb": "2 bd / 1 ba", "addr": "5853 SW Oleson Road , Portland, OR 97225", "img": "https://images.cdn.appfolio.com/propmhomes/images/99f35fd1-4d24-41c8-92b0-589ca670ffc2/medium.jpg", "url": "https://propmhomes.appfolio.com/listings/detail/791e46e9-47ce-48b0-9f79-82138e6576f8", "isNew": false}, {"id": "l3dfb2444e9", "lat": 45.5152671, "lng": -122.6412301, "rent": 1700.0, "beds": 2.0, "cost": "$1,700", "bb": "2 bd / 1 ba", "addr": "2423 SE Taylor St., Portland, OR 97214", "img": "https://images.cdn.appfolio.com/criteriaproperties/images/edc782e3-b519-4fb5-a87e-ac7c5c4a74de/medium.jpg", "url": "https://bluestone.appfolio.com/listings/detail/7c94efaa-00e1-4ae2-87fb-a46e775d4c8a", "isNew": false}, {"id": "lb47eb7f712", "lat": 45.4873834, "lng": -122.7395786, "rent": 1750.0, "beds": 2.0, "cost": "$1,750", "bb": "2 bd / 2 ba", "addr": "6061 SW Beaverton-Hillsdale, Portland, OR 97221", "img": "https://images.cdn.appfolio.com/criteriaproperties/images/ab54653f-6e2c-43b2-87b3-b2bf64233008/medium.jpg", "url": "https://bluestone.appfolio.com/listings/detail/e870cdc3-7806-4aea-92de-9ba7dbf8d200", "isNew": false}, {"id": "lbae74eb7c8", "lat": 45.5451554, "lng": -122.6649577, "rent": 1945.0, "beds": 2.0, "cost": "$1,945", "bb": "2 bd / 1 ba", "addr": "68 NE Monroe Ave., Portland, OR 97212", "img": "https://images.cdn.appfolio.com/gridpm/images/9a80188d-d335-4316-b602-2872eda18557/medium.jpg", "url": "https://gridpm.appfolio.com/listings/detail/a97d16a5-e86c-44ca-9115-f52889c381e1", "isNew": false}, {"id": "l19e44b8f16", "lat": 45.5019816, "lng": -122.6107081, "rent": 1950.0, "beds": 2.0, "cost": "$1,950", "bb": "2 bd / 1 ba", "addr": "2836 SE 50th Avenue, Portland, OR 97206", "img": "https://images.cdn.appfolio.com/rentportlandhomesdarlaandrewsoffice/images/84b3ef95-4827-4351-8c1d-7a01bec8cc2b/medium.jpg", "url": "https://rentportlandhomesdarlaandrewsoffice.appfolio.com/listings/detail/ec25afd1-5880-41d9-8ada-fbb473bee575", "isNew": false}, {"id": "l81ab42a979", "lat": 45.5342707, "lng": -122.4884207, "rent": 1970.0, "beds": 2.0, "cost": "$1,970", "bb": "2 bd / 2 ba", "addr": "16980 NE Halsey Street , Portland, OR 97230", "img": "https://images.cdn.appfolio.com/onyx/images/1089189a-0376-4ccd-aa09-1fd05cdb0746/medium.jpg", "url": "https://onyx.appfolio.com/listings/detail/27c1f720-a117-4b18-8b0e-2720d076acbb", "isNew": false}, {"id": "la85810f5c2", "lat": 45.4723792, "lng": -122.6944485, "rent": 1995.0, "beds": 2.0, "cost": "$1,995", "bb": "2 bd / 1 ba", "addr": "1501 SW Bertha Blvd , Portland, OR 97219", "img": "https://images.cdn.appfolio.com/corerealtors/images/e51e5eb4-21b7-4b67-a3b9-a6d1b1ae2323/medium.jpg", "url": "https://corerealtors.appfolio.com/listings/detail/a7c6a084-732a-477b-b045-a6ae658dd68d", "isNew": false}, {"id": "l52ef55c4a0", "lat": 45.4780338, "lng": -122.7472683, "rent": 2099.0, "beds": 2.0, "cost": "$2,099", "bb": "2 bd / 1 ba", "addr": "5855 SW Oleson Road , Portland, OR 97225", "img": "https://images.cdn.appfolio.com/propmhomes/images/cd1376eb-dede-4d0e-8b3c-0b35353503c8/medium.jpg", "url": "https://propmhomes.appfolio.com/listings/detail/9b1ca427-364b-4d20-809a-27568954822e", "isNew": false}, {"id": "l5c60ce781c", "lat": 45.5016652, "lng": -122.5351294, "rent": 2145.0, "beds": 4.0, "cost": "$2,145", "bb": "4 bd / 1 ba", "addr": "2811 SE 125th Ave, Portland, OR 97236", "img": "https://images.cdn.appfolio.com/peakam/images/5315455f-40a5-4a22-9a90-25dfa0edf5f3/medium.jpg", "url": "https://peakam.appfolio.com/listings/detail/2e539c00-4cae-46a8-8289-c4fd36662286", "isNew": false}, {"id": "l3692ffa803", "lat": 45.5342707, "lng": -122.4884207, "rent": 2175.0, "beds": 3.0, "cost": "$2,175", "bb": "3 bd / 2.5 ba", "addr": "16970 NE Halsey Street , Portland, OR 97230", "img": "https://images.cdn.appfolio.com/onyx/images/596a3f0c-cc11-4eee-9eba-9035818bec3e/medium.jpg", "url": "https://onyx.appfolio.com/listings/detail/3e00bff2-0b43-41f6-8f03-d13cf25d05d7", "isNew": false}, {"id": "lc66ac63435", "lat": 45.5342707, "lng": -122.4884207, "rent": 2175.0, "beds": 3.0, "cost": "$2,175", "bb": "3 bd / 2.5 ba", "addr": "16962 NE Halsey Street, Portland, OR 97230", "img": "https://images.cdn.appfolio.com/onyx/images/d81a94b8-2c43-4aad-9931-c33baff0f8dc/medium.jpg", "url": "https://onyx.appfolio.com/listings/detail/42c015b6-f7b8-4433-bc26-a9e7af12256f", "isNew": false}, {"id": "l7425a75759", "lat": 45.52081, "lng": -122.485432, "rent": 2195.0, "beds": 3.0, "cost": "$2,195", "bb": "3 bd / 2.5 ba", "addr": "17227 SE Pine Street, Portland, OR 97233", "img": "https://images.cdn.appfolio.com/rentportlandhomesdarlaandrewsoffice/images/2d51967f-3fcc-45dc-8386-5ce4357a1f89/medium.jpg", "url": "https://rentportlandhomesdarlaandrewsoffice.appfolio.com/listings/detail/d0299efe-3bd4-4ac8-9f96-fcd54ea27d8a", "isNew": false}, {"id": "l5e0a6b1cdb", "lat": 45.4848173, "lng": -122.5877484, "rent": 2195.0, "beds": 3.0, "cost": "$2,195", "bb": "3 bd / 2.5 ba", "addr": "5254 SE 73rd Ave, Portland, OR 97206", "img": "https://images.cdn.appfolio.com/gordonproperties/images/e2f65247-921c-4253-889e-e689d869b870/medium.jpg", "url": "https://gordonproperties.appfolio.com/listings/detail/23110698-b9cf-477a-b308-8df04d61dd58", "isNew": false}];
+  let mapMode = 'all', map = null, layer = null;
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+  function visible(p) {
+    if (mapMode === 'new' && !p.isNew) return false;
+    const el = document.getElementById(p.id);   // respect the card filters (search, rent, beds, no unit #)
+    return !el || el.style.display !== 'none';
+  }
+  function drawMap(fit) {
+    if (!map) return;
+    layer.clearLayers();
+    const shown = POINTS.filter(visible);
+    shown.forEach(p => {
+      const m = L.circleMarker([p.lat, p.lng], {
+        radius: p.isNew ? 8 : 6, weight: 2, color: '#fff',
+        fillColor: p.isNew ? '#d9480f' : '#0b5d66', fillOpacity: .9,
+      });
+      m.bindPopup(`<div class="pop">${p.img ? `<img src="${esc(p.img)}">` : ''}
+        <b>${esc(p.cost)}</b>${p.isNew ? '<span class="new">NEW</span>' : ''}<br>${esc(p.bb)}<br>${esc(p.addr)}<br>
+        <a href="${esc(p.url)}" target="_blank" rel="noopener">View listing →</a> ·
+        <a href="#" onclick="jumpTo('${p.id}');return false;">Show card</a></div>`);
+      m.bindTooltip(`${esc(p.cost)} · ${esc(p.bb)}`);
+      m.addTo(layer);
+    });
+    if (fit && shown.length) map.fitBounds(L.latLngBounds(shown.map(p => [p.lat, p.lng])), { padding: [30, 30], maxZoom: 14 });
+  }
+  function jumpTo(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 2000);
+  }
+  function setMode(mode) {
+    mapMode = mode;
+    $('mapNew').classList.toggle('on', mode === 'new');
+    $('mapAll').classList.toggle('on', mode === 'all');
+    drawMap(true);
+  }
+  $('mapNew').addEventListener('click', () => setMode('new'));
+  $('mapAll').addEventListener('click', () => setMode('all'));
+  if (window.L) {
+    map = L.map('map', { scrollWheelZoom: false }).setView([45.52, -122.65], 11);
+    // Tile providers that work with no API key from a file:// page (verified Oct 2026).
+    // tile.openstreetmap.org (403, usage policy) and CARTO (API key required) do NOT.
+    // If the current provider keeps failing, fall through to the next one.
+    const PROVIDERS = [
+      { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+         opts: { maxZoom: 19, attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, USGS, NGA, EPA, USDA, NPS' } },
+      { url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+         opts: { maxZoom: 17, subdomains: 'abc', attribution: 'Map data &copy; OpenStreetMap contributors, SRTM | Style &copy; OpenTopoMap (CC-BY-SA)' } },
+    ];
+    let providerIdx = 0, tiles = null, tileErrors = 0;
+    function useProvider(i) {
+      if (tiles) map.removeLayer(tiles);
+      providerIdx = i; tileErrors = 0;
+      tiles = L.tileLayer(PROVIDERS[i].url, PROVIDERS[i].opts).addTo(map);
+      tiles.on('tileerror', () => {
+        if (++tileErrors >= 4 && providerIdx + 1 < PROVIDERS.length) useProvider(providerIdx + 1);
+      });
+      tiles.on('tileload', () => { tileErrors = 0; });
+    }
+    useProvider(0);
+    layer = L.layerGroup().addTo(map);
+    map.on('click', () => map.scrollWheelZoom.enable());
+    drawMap(true);
+  } else {
+    $('map').innerHTML = '<div class="empty">Map library could not load (offline?).</div>';
+  }
+  $('sort').addEventListener('change', () => { sort(); apply(); });
+  apply();
+</script>
+</body>
+</html>
