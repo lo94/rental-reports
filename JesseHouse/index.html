@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JesseHouse – 3 listings</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  .map-wrap { padding:20px 32px 0; }
+  .map-bar { display:flex; align-items:center; gap:14px; margin-bottom:10px; flex-wrap:wrap; }
+  .map-bar h2 { margin:0; font-size:21px; }
+  .toggle { display:inline-flex; border:1px solid #d1d5db; border-radius:8px; overflow:hidden; }
+  .toggle button { border:0; background:#fff; padding:7px 16px; font-size:14px; cursor:pointer; }
+  .toggle button.on { background:var(--accent); color:#fff; }
+  .legend { font-size:13px; color:var(--muted); display:flex; gap:14px; align-items:center; }
+  .dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:4px; vertical-align:-1px; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.3); }
+  #map { height:460px; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .pop { width:220px; font-family:inherit; }
+  .pop img { width:100%; height:130px; object-fit:cover; border-radius:6px; display:block; margin-bottom:6px; }
+  .pop b { font-size:16px; }
+  .pop .new { color:var(--new); font-weight:700; font-size:11px; margin-left:6px; }
+  .pop a { color:var(--accent); font-weight:600; }
+  .card.flash { outline:3px solid var(--new); outline-offset:2px; }
+</style>
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --ink:#1d2330; --muted:#6b7280; --accent:#0b5d66; --new:#d9480f; --house:#2b8a3e; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--accent); color:#fff; padding:24px 32px; }
+  header h1 { margin:0 0 6px; font-size:26px; }
+  header .sub { opacity:.85; font-size:14px; }
+  .stats { display:flex; gap:12px; flex-wrap:wrap; margin-top:16px; }
+  .stat { background:rgba(255,255,255,.14); border-radius:10px; padding:10px 16px; min-width:120px; }
+  .stat b { display:block; font-size:22px; }
+  .stat span { font-size:12px; text-transform:uppercase; letter-spacing:.05em; opacity:.85; }
+  .chips { margin-top:14px; }
+  .chip { display:inline-block; background:#fff; color:var(--accent); border-radius:999px; padding:3px 12px; margin:0 6px 6px 0; font-size:13px; font-weight:600; }
+  .controls { position:sticky; top:0; z-index:5; background:#fff; border-bottom:1px solid #e5e7eb; padding:12px 32px;
+               display:flex; gap:16px; align-items:center; flex-wrap:wrap; box-shadow:0 2px 6px rgba(0,0,0,.05); }
+  .controls input[type=search] { padding:8px 12px; border:1px solid #d1d5db; border-radius:8px; min-width:260px; font-size:14px; }
+  .controls select, .controls input[type=number] { padding:7px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; }
+  .controls input[type=number] { width:110px; }
+  .controls label { font-size:14px; display:flex; align-items:center; gap:6px; cursor:pointer; }
+  main { padding:8px 32px 48px; }
+  section h2 { font-size:21px; margin:28px 0 14px; padding-bottom:8px; border-bottom:2px solid #d1d5db; display:flex; align-items:baseline; gap:10px; }
+  section.new-section h2 { border-color:var(--new); color:var(--new); }
+  section h2 .count { font-size:14px; color:var(--muted); font-weight:400; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:20px; }
+  .card { background:var(--card); border-radius:14px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.08); display:flex; flex-direction:column; transition:transform .12s, box-shadow .12s; }
+  .card:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,.12); }
+  .photo { position:relative; display:block; aspect-ratio:4/3; background:#e5e7eb; }
+  .photo img { width:100%; height:100%; object-fit:cover; display:block; }
+  .photo.noimg::after { content:"No photo"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:14px; }
+  .badges { position:absolute; top:10px; left:10px; display:flex; gap:6px; }
+  .badge { font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; color:#fff; letter-spacing:.04em; }
+  .badge.new { background:var(--new); }
+  .badge.house { background:var(--house); }
+  .body { padding:14px 16px 16px; display:flex; flex-direction:column; gap:6px; flex:1; }
+  .rent { font-size:22px; font-weight:700; }
+  .rent span { font-size:13px; font-weight:400; color:var(--muted); }
+  .facts { font-size:14px; color:#374151; }
+  .address a { color:var(--ink); text-decoration:none; font-weight:600; font-size:14px; }
+  .address a:hover { text-decoration:underline; }
+  .meta { font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:2px; }
+  .meta b { color:#4b5563; font-weight:600; }
+  .btn { margin-top:auto; align-self:flex-start; background:var(--accent); color:#fff; text-decoration:none; padding:8px 14px; border-radius:8px; font-size:14px; font-weight:600; }
+  .btn:hover { filter:brightness(1.1); }
+  .empty { grid-column:1/-1; text-align:center; color:var(--muted); padding:60px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>JesseHouse – Rental Search Report</h1>
+  <div class="sub">Generated Saturday, October 24, 2026 at 12:50 PM · 3 property managers checked via direct API/HTTP</div>
+  <div class="stats">
+    <div class="stat"><b>3</b><span>Matches</span></div>
+    <div class="stat"><b>0</b><span>New since last run</span></div>
+    <div class="stat"><b>3</b><span>No unit # (likely houses)</span></div>
+    <div class="stat"><b>$1,995 – $2,200</b><span>Rent range</span></div>
+  </div>
+  <div class="chips"><span class="chip">Portland, OR</span><span class="chip">Rent ≥ $1,300</span><span class="chip">Rent ≤ $2,200</span><span class="chip">2+ beds</span><span class="chip">1+ baths</span><span class="chip">Cats allowed</span><span class="chip">Houses only (no unit #)</span></div>
+</header>
+
+<div class="controls">
+  <input type="search" id="q" placeholder="Search address, company, pet policy…">
+  <select id="sort">
+    <option value="rent-asc">Rent: low → high</option>
+    <option value="rent-desc">Rent: high → low</option>
+    <option value="beds-desc">Most bedrooms</option>
+  </select>
+  <input type="number" id="maxRent" placeholder="Max rent" step="50" min="0">
+  <select id="minBeds">
+    <option value="0">Any beds</option>
+    <option value="1">1+ beds</option>
+    <option value="2">2+ beds</option>
+    <option value="3">3+ beds</option>
+  </select>
+  <label><input type="checkbox" id="houseOnly"> No unit # only</label>
+</div>
+
+<div class="map-wrap">
+  <div class="map-bar">
+    <h2>Map</h2>
+    <div class="toggle">
+      <button id="mapNew" type="button">New (0)</button>
+      <button id="mapAll" type="button" class="on">All (3)</button>
+    </div>
+    <span class="legend">
+      <span><span class="dot" style="background:#d9480f"></span>New</span>
+      <span><span class="dot" style="background:#0b5d66"></span>Other</span>
+      
+    </span>
+  </div>
+  <div id="map"></div>
+</div>
+
+<main>
+  <section class="new-section">
+    <h2>New Since Last Check <span class="count" id="count-new"></span></h2>
+    <div class="grid" id="grid-new">
+<div class="empty">No new listings since the last check.</div>
+    </div>
+  </section>
+  <section>
+    <h2>All Listings <span class="count" id="count-all"></span></h2>
+    <div class="grid" id="grid-all">
+
+    <article class="card" id="l510d65500e" data-rent="1995" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="5006 ne alberta st., portland, or 97218 alderpropertymanagement cats allowed, dogs allowed">
+      <a class="photo " href="https://alder.appfolio.com/listings/detail/7449b422-3709-4e0d-828a-498847dd9492" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/alder/images/df2371a9-6c88-4eb8-ad74-8cc0756f6a38/medium.jpg" alt="5006 NE Alberta St., Portland, OR 97218" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,995<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 1,020 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=5006+NE+Alberta+St.%2C+Portland%2C+OR+97218" target="_blank" rel="noopener">5006 NE Alberta St., Portland, OR 97218</a></div>
+        <div class="meta">
+          <div><b>Company:</b> AlderPropertyManagement</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://alder.appfolio.com/listings/detail/7449b422-3709-4e0d-828a-498847dd9492" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="le5e26fb34c" data-rent="2195" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="4195 se 118th place, portland, or 97266 pacificdependable cats allowed, dogs allowed">
+      <a class="photo " href="https://pacificdependable.appfolio.com/listings/detail/f1554cff-77ab-4c26-8dbe-f91fdb3d9c59" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/pacificdependable/images/80834da4-de67-470c-9cc3-142b643e7c42/medium.jpg" alt="4195 SE 118th Place, Portland, OR 97266" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$2,195<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 1,281 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=4195+SE+118th+Place%2C+Portland%2C+OR+97266" target="_blank" rel="noopener">4195 SE 118th Place, Portland, OR 97266</a></div>
+        <div class="meta">
+          <div><b>Company:</b> PacificDependable</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://pacificdependable.appfolio.com/listings/detail/f1554cff-77ab-4c26-8dbe-f91fdb3d9c59" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l094c1435c3" data-rent="2200" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="3601 n russet st, portland, or 97217 rentportlandhomes cats allowed, small dogs allowed">
+      <a class="photo " href="https://rentportlandhomesprofessionals.appfolio.com/listings/detail/d6875817-fecf-49a2-8ca4-3461d596082b" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/rentportlandhomesprofessionals/images/4722079d-7223-4546-92a2-5fe810fe2b3e/medium.jpeg" alt="3601 N Russet St, Portland, OR 97217" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$2,200<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 1,134 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=3601+N+Russet+St%2C+Portland%2C+OR+97217" target="_blank" rel="noopener">3601 N Russet St, Portland, OR 97217</a></div>
+        <div class="meta">
+          <div><b>Company:</b> RentPortlandHomes</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://rentportlandhomesprofessionals.appfolio.com/listings/detail/d6875817-fecf-49a2-8ca4-3461d596082b" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+    </div>
+  </section>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const grids = [...document.querySelectorAll('.grid')];
+  function apply() {
+    const q = $('q').value.trim().toLowerCase();
+    const maxRent = parseFloat($('maxRent').value) || Infinity;
+    const minBeds = parseFloat($('minBeds').value) || 0;
+    const houseOnly = $('houseOnly').checked;
+    grids.forEach(g => {
+      const cards = [...g.querySelectorAll('.card')];
+      let shown = 0;
+      cards.forEach(c => {
+        const d = c.dataset;
+        const ok = (!q || d.text.includes(q)) && (+d.rent <= maxRent) && (+d.beds >= minBeds)
+                && (!houseOnly || d.house === '1');
+        c.style.display = ok ? '' : 'none';
+        if (ok) shown++;
+      });
+      $('count-' + g.id.slice(5)).textContent =
+        cards.length ? (shown === cards.length ? `(${shown})` : `(showing ${shown} of ${cards.length})`) : '(0)';
+    });
+  }
+  function sort() {
+    const key = {
+      'rent-asc':  (a, b) => (+a.dataset.rent || 1e9) - (+b.dataset.rent || 1e9),
+      'rent-desc': (a, b) => +b.dataset.rent - +a.dataset.rent,
+      'beds-desc': (a, b) => +b.dataset.beds - +a.dataset.beds || +a.dataset.rent - +b.dataset.rent,
+    }[$('sort').value];
+    grids.forEach(g => [...g.querySelectorAll('.card')].sort(key).forEach(c => g.appendChild(c)));
+  }
+  ['q','maxRent','minBeds','houseOnly'].forEach(id => $(id).addEventListener('input', apply));
+  ['q','maxRent','minBeds','houseOnly'].forEach(id => $(id).addEventListener('input', () => drawMap(false)));
+
+  // ---- Map ----
+  const POINTS = [{"id": "l510d65500e", "lat": 45.558928, "lng": -122.611413, "rent": 1995.0, "beds": 2.0, "cost": "$1,995", "bb": "2 bd / 1 ba", "addr": "5006 NE Alberta St., Portland, OR 97218", "img": "https://images.cdn.appfolio.com/alder/images/df2371a9-6c88-4eb8-ad74-8cc0756f6a38/medium.jpg", "url": "https://alder.appfolio.com/listings/detail/7449b422-3709-4e0d-828a-498847dd9492", "isNew": false}, {"id": "le5e26fb34c", "lat": 45.4923741, "lng": -122.541515, "rent": 2195.0, "beds": 2.0, "cost": "$2,195", "bb": "2 bd / 1 ba", "addr": "4195 SE 118th Place, Portland, OR 97266", "img": "https://images.cdn.appfolio.com/pacificdependable/images/80834da4-de67-470c-9cc3-142b643e7c42/medium.jpg", "url": "https://pacificdependable.appfolio.com/listings/detail/f1554cff-77ab-4c26-8dbe-f91fdb3d9c59", "isNew": false}, {"id": "l094c1435c3", "lat": 45.5781382, "lng": -122.7037134, "rent": 2200.0, "beds": 2.0, "cost": "$2,200", "bb": "2 bd / 1 ba", "addr": "3601 N Russet St, Portland, OR 97217", "img": "https://images.cdn.appfolio.com/rentportlandhomesprofessionals/images/4722079d-7223-4546-92a2-5fe810fe2b3e/medium.jpeg", "url": "https://rentportlandhomesprofessionals.appfolio.com/listings/detail/d6875817-fecf-49a2-8ca4-3461d596082b", "isNew": false}];
+  let mapMode = 'all', map = null, layer = null;
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+  function visible(p) {
+    if (mapMode === 'new' && !p.isNew) return false;
+    const el = document.getElementById(p.id);   // respect the card filters (search, rent, beds, no unit #)
+    return !el || el.style.display !== 'none';
+  }
+  function drawMap(fit) {
+    if (!map) return;
+    layer.clearLayers();
+    const shown = POINTS.filter(visible);
+    shown.forEach(p => {
+      const m = L.circleMarker([p.lat, p.lng], {
+        radius: p.isNew ? 8 : 6, weight: 2, color: '#fff',
+        fillColor: p.isNew ? '#d9480f' : '#0b5d66', fillOpacity: .9,
+      });
+      m.bindPopup(`<div class="pop">${p.img ? `<img src="${esc(p.img)}">` : ''}
+        <b>${esc(p.cost)}</b>${p.isNew ? '<span class="new">NEW</span>' : ''}<br>${esc(p.bb)}<br>${esc(p.addr)}<br>
+        <a href="${esc(p.url)}" target="_blank" rel="noopener">View listing →</a> ·
+        <a href="#" onclick="jumpTo('${p.id}');return false;">Show card</a></div>`);
+      m.bindTooltip(`${esc(p.cost)} · ${esc(p.bb)}`);
+      m.addTo(layer);
+    });
+    if (fit && shown.length) map.fitBounds(L.latLngBounds(shown.map(p => [p.lat, p.lng])), { padding: [30, 30], maxZoom: 14 });
+  }
+  function jumpTo(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 2000);
+  }
+  function setMode(mode) {
+    mapMode = mode;
+    $('mapNew').classList.toggle('on', mode === 'new');
+    $('mapAll').classList.toggle('on', mode === 'all');
+    drawMap(true);
+  }
+  $('mapNew').addEventListener('click', () => setMode('new'));
+  $('mapAll').addEventListener('click', () => setMode('all'));
+  if (window.L) {
+    map = L.map('map', { scrollWheelZoom: false }).setView([45.52, -122.65], 11);
+    // Tile providers that work with no API key from a file:// page (verified Oct 2026).
+    // tile.openstreetmap.org (403, usage policy) and CARTO (API key required) do NOT.
+    // If the current provider keeps failing, fall through to the next one.
+    const PROVIDERS = [
+      { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+         opts: { maxZoom: 19, attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, USGS, NGA, EPA, USDA, NPS' } },
+      { url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+         opts: { maxZoom: 17, subdomains: 'abc', attribution: 'Map data &copy; OpenStreetMap contributors, SRTM | Style &copy; OpenTopoMap (CC-BY-SA)' } },
+    ];
+    let providerIdx = 0, tiles = null, tileErrors = 0;
+    function useProvider(i) {
+      if (tiles) map.removeLayer(tiles);
+      providerIdx = i; tileErrors = 0;
+      tiles = L.tileLayer(PROVIDERS[i].url, PROVIDERS[i].opts).addTo(map);
+      tiles.on('tileerror', () => {
+        if (++tileErrors >= 4 && providerIdx + 1 < PROVIDERS.length) useProvider(providerIdx + 1);
+      });
+      tiles.on('tileload', () => { tileErrors = 0; });
+    }
+    useProvider(0);
+    layer = L.layerGroup().addTo(map);
+    map.on('click', () => map.scrollWheelZoom.enable());
+    drawMap(true);
+  } else {
+    $('map').innerHTML = '<div class="empty">Map library could not load (offline?).</div>';
+  }
+  $('sort').addEventListener('change', () => { sort(); apply(); });
+  apply();
+</script>
+<section style="margin:32px auto;padding:16px 20px;max-width:1100px;font:14px -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#4b5563"><b>Older reports:</b> <a href="history/2026-10-24-0148/">Sat Oct 24, 1:48 AM</a> · <a href="history/2026-10-23-2147/">Fri Oct 23, 9:47 PM</a> · <a href="history/2026-10-23-1808/">Fri Oct 23, 6:08 PM</a> · <a href="history/2026-10-23-1345/">Fri Oct 23, 1:45 PM</a> · <a href="history/2026-10-23-0949/">Fri Oct 23, 9:49 AM</a> · <a href="history/2026-10-23-0554/">Fri Oct 23, 5:54 AM</a> · <a href="history/2026-10-23-0151/">Fri Oct 23, 1:51 AM</a> · <a href="history/2026-10-22-2150/">Thu Oct 22, 9:50 PM</a> · <a href="history/2026-10-22-1812/">Thu Oct 22, 6:12 PM</a> · <a href="history/2026-10-22-1346/">Thu Oct 22, 1:46 PM</a> · <a href="history/2026-10-22-0948/">Thu Oct 22, 9:48 AM</a> · <a href="history/2026-10-22-0557/">Thu Oct 22, 5:57 AM</a> · <a href="history/">all 116</a></section></body>
+</html>
