@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PortlandTownhouses – 26 listings</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  .map-wrap { padding:20px 32px 0; }
+  .map-bar { display:flex; align-items:center; gap:14px; margin-bottom:10px; flex-wrap:wrap; }
+  .map-bar h2 { margin:0; font-size:21px; }
+  .toggle { display:inline-flex; border:1px solid #d1d5db; border-radius:8px; overflow:hidden; }
+  .toggle button { border:0; background:#fff; padding:7px 16px; font-size:14px; cursor:pointer; }
+  .toggle button.on { background:var(--accent); color:#fff; }
+  .legend { font-size:13px; color:var(--muted); display:flex; gap:14px; align-items:center; }
+  .dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:4px; vertical-align:-1px; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.3); }
+  #map { height:460px; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .pop { width:220px; font-family:inherit; }
+  .pop img { width:100%; height:130px; object-fit:cover; border-radius:6px; display:block; margin-bottom:6px; }
+  .pop b { font-size:16px; }
+  .pop .new { color:var(--new); font-weight:700; font-size:11px; margin-left:6px; }
+  .pop a { color:var(--accent); font-weight:600; }
+  .card.flash { outline:3px solid var(--new); outline-offset:2px; }
+</style>
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --ink:#1d2330; --muted:#6b7280; --accent:#0b5d66; --new:#d9480f; --house:#2b8a3e; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--accent); color:#fff; padding:24px 32px; }
+  header h1 { margin:0 0 6px; font-size:26px; }
+  header .sub { opacity:.85; font-size:14px; }
+  .stats { display:flex; gap:12px; flex-wrap:wrap; margin-top:16px; }
+  .stat { background:rgba(255,255,255,.14); border-radius:10px; padding:10px 16px; min-width:120px; }
+  .stat b { display:block; font-size:22px; }
+  .stat span { font-size:12px; text-transform:uppercase; letter-spacing:.05em; opacity:.85; }
+  .chips { margin-top:14px; }
+  .chip { display:inline-block; background:#fff; color:var(--accent); border-radius:999px; padding:3px 12px; margin:0 6px 6px 0; font-size:13px; font-weight:600; }
+  .controls { position:sticky; top:0; z-index:5; background:#fff; border-bottom:1px solid #e5e7eb; padding:12px 32px;
+               display:flex; gap:16px; align-items:center; flex-wrap:wrap; box-shadow:0 2px 6px rgba(0,0,0,.05); }
+  .controls input[type=search] { padding:8px 12px; border:1px solid #d1d5db; border-radius:8px; min-width:260px; font-size:14px; }
+  .controls select, .controls input[type=number] { padding:7px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; }
+  .controls input[type=number] { width:110px; }
+  .controls label { font-size:14px; display:flex; align-items:center; gap:6px; cursor:pointer; }
+  main { padding:8px 32px 48px; }
+  section h2 { font-size:21px; margin:28px 0 14px; padding-bottom:8px; border-bottom:2px solid #d1d5db; display:flex; align-items:baseline; gap:10px; }
+  section.new-section h2 { border-color:var(--new); color:var(--new); }
+  section h2 .count { font-size:14px; color:var(--muted); font-weight:400; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:20px; }
+  .card { background:var(--card); border-radius:14px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.08); display:flex; flex-direction:column; transition:transform .12s, box-shadow .12s; }
+  .card:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,.12); }
+  .photo { position:relative; display:block; aspect-ratio:4/3; background:#e5e7eb; }
+  .photo img { width:100%; height:100%; object-fit:cover; display:block; }
+  .photo.noimg::after { content:"No photo"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:14px; }
+  .badges { position:absolute; top:10px; left:10px; display:flex; gap:6px; }
+  .badge { font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; color:#fff; letter-spacing:.04em; }
+  .badge.new { background:var(--new); }
+  .badge.house { background:var(--house); }
+  .body { padding:14px 16px 16px; display:flex; flex-direction:column; gap:6px; flex:1; }
+  .rent { font-size:22px; font-weight:700; }
+  .rent span { font-size:13px; font-weight:400; color:var(--muted); }
+  .facts { font-size:14px; color:#374151; }
+  .address a { color:var(--ink); text-decoration:none; font-weight:600; font-size:14px; }
+  .address a:hover { text-decoration:underline; }
+  .meta { font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:2px; }
+  .meta b { color:#4b5563; font-weight:600; }
+  .btn { margin-top:auto; align-self:flex-start; background:var(--accent); color:#fff; text-decoration:none; padding:8px 14px; border-radius:8px; font-size:14px; font-weight:600; }
+  .btn:hover { filter:brightness(1.1); }
+  .empty { grid-column:1/-1; text-align:center; color:var(--muted); padding:60px 0; }
+</style>
+</head>
+<body>
+<div style="position:sticky;top:0;z-index:9999;background:#fff3cd;color:#664d03;border-bottom:1px solid #ffe69c;padding:10px 16px;font:14px -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">Report from <b>Fri Oct 30, 1:51 AM</b>. "New" means new since the check before this one. <a href="../../">View the latest report</a> · <a href="../">All reports</a></div><header>
+  <h1>PortlandTownhouses – Rental Search Report</h1>
+  <div class="sub">Generated Friday, October 30, 2026 at 08:51 AM · 18 property managers checked via direct API/HTTP</div>
+  <div class="stats">
+    <div class="stat"><b>26</b><span>Matches</span></div>
+    <div class="stat"><b>0</b><span>New since last run</span></div>
+    <div class="stat"><b>16</b><span>No unit # (likely houses)</span></div>
+    <div class="stat"><b>$1,345 – $2,195</b><span>Rent range</span></div>
+  </div>
+  <div class="chips"><span class="chip">Portland, OR</span><span class="chip">Rent ≥ $1,300</span><span class="chip">Rent ≤ $2,200</span><span class="chip">2+ beds</span><span class="chip">1+ baths</span><span class="chip">Cats allowed</span></div>
+</header>
+
+<div class="controls">
+  <input type="search" id="q" placeholder="Search address, company, pet policy…">
+  <select id="sort">
+    <option value="rent-asc">Rent: low → high</option>
+    <option value="rent-desc">Rent: high → low</option>
+    <option value="beds-desc">Most bedrooms</option>
+  </select>
+  <input type="number" id="maxRent" placeholder="Max rent" step="50" min="0">
+  <select id="minBeds">
+    <option value="0">Any beds</option>
+    <option value="1">1+ beds</option>
+    <option value="2">2+ beds</option>
+    <option value="3">3+ beds</option>
+  </select>
+  <label><input type="checkbox" id="houseOnly"> No unit # only</label>
+</div>
+
+<div class="map-wrap">
+  <div class="map-bar">
+    <h2>Map</h2>
+    <div class="toggle">
+      <button id="mapNew" type="button">New (0)</button>
+      <button id="mapAll" type="button" class="on">All (26)</button>
+    </div>
+    <span class="legend">
+      <span><span class="dot" style="background:#d9480f"></span>New</span>
+      <span><span class="dot" style="background:#0b5d66"></span>Other</span>
+      
+    </span>
+  </div>
+  <div id="map"></div>
+</div>
+
+<main>
+  <section class="new-section">
+    <h2>New Since Last Check <span class="count" id="count-new"></span></h2>
+    <div class="grid" id="grid-new">
+<div class="empty">No new listings since the last check.</div>
+    </div>
+  </section>
+  <section>
+    <h2>All Listings <span class="count" id="count-all"></span></h2>
+    <div class="grid" id="grid-all">
+
+    <article class="card" id="l65d8ee8e11" data-rent="1345" data-beds="2" data-baths="1"
+             data-new="0" data-house="0"
+             data-text="5011 sw beaverton hillsdale hwy apt c, portland, or 97221 uptownpm cats allowed, dogs allowed">
+      <a class="photo " href="https://uptownproperties.appfolio.com/listings/detail/8ddfe767-5fb0-4be4-afdd-f5291c0545d0" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/uptownproperties/images/33d7a269-db12-43b1-bc4d-a5663f663c6c/medium.jpg" alt="5011 SW Beaverton Hillsdale Hwy Apt C, Portland, OR 97221" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,345<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 832 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=5011+SW+Beaverton+Hillsdale+Hwy+Apt+C%2C+Portland%2C+OR+97221" target="_blank" rel="noopener">5011 SW Beaverton Hillsdale Hwy Apt C, Portland, OR 97221</a></div>
+        <div class="meta">
+          <div><b>Company:</b> UptownPM</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://uptownproperties.appfolio.com/listings/detail/8ddfe767-5fb0-4be4-afdd-f5291c0545d0" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l73559c1f50" data-rent="1349" data-beds="2" data-baths="1"
+             data-new="0" data-house="0"
+             data-text="8110 se raymond st. - unit a, portland, or 97206 peakassetmanagement cats allowed, dogs allowed">
+      <a class="photo " href="https://peakam.appfolio.com/listings/detail/e823a38e-783d-4fa1-89aa-7485db61d04d" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/peakam/images/e5f3a7fa-6bc1-4e9f-996a-b6f76c0d9d38/medium.jpeg" alt="8110 SE Raymond St. - Unit A, Portland, OR 97206" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,349<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 1,030 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=8110+SE+Raymond+St.+-+Unit+A%2C+Portland%2C+OR+97206" target="_blank" rel="noopener">8110 SE Raymond St. - Unit A, Portland, OR 97206</a></div>
+        <div class="meta">
+          <div><b>Company:</b> PeakAssetManagement</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://peakam.appfolio.com/listings/detail/e823a38e-783d-4fa1-89aa-7485db61d04d" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l1a82db6f72" data-rent="1350" data-beds="2" data-baths="1"
+             data-new="0" data-house="0"
+             data-text="3548 se 119th ave #c, portland, or 97266 rmspdx cats allowed, dogs allowed">
+      <a class="photo " href="https://rmspdx.appfolio.com/listings/detail/fbcd1082-4d81-4374-810b-38f68effb1f8" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/rmspdx/images/fb18c879-528a-49a4-b78e-6c6aefabc418/medium.jpg" alt="3548 SE 119th Ave #C, Portland, OR 97266" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,350<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 850 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=3548+SE+119th+Ave+%23C%2C+Portland%2C+OR+97266" target="_blank" rel="noopener">3548 SE 119th Ave #C, Portland, OR 97266</a></div>
+        <div class="meta">
+          <div><b>Company:</b> RMSPDX</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://rmspdx.appfolio.com/listings/detail/fbcd1082-4d81-4374-810b-38f68effb1f8" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="ld9fb7823bf" data-rent="1395" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="3809 se 164th avenue, portland, or 97236 rentportlandhomes cats allowed, dogs allowed">
+      <a class="photo " href="https://rentportlandhomesprofessionals.appfolio.com/listings/detail/ab4393d0-b617-465d-a038-71f4cf73cebf" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/rentportlandhomesprofessionals/images/377236b4-f94a-466d-97bd-40d7cea581e6/medium.jpg" alt="3809 SE 164th Avenue, Portland, OR 97236" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,395<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 900 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=3809+SE+164th+Avenue%2C+Portland%2C+OR+97236" target="_blank" rel="noopener">3809 SE 164th Avenue, Portland, OR 97236</a></div>
+        <div class="meta">
+          <div><b>Company:</b> RentPortlandHomes</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://rentportlandhomesprofessionals.appfolio.com/listings/detail/ab4393d0-b617-465d-a038-71f4cf73cebf" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l075b74aaa8" data-rent="1395" data-beds="2" data-baths="1"
+             data-new="0" data-house="0"
+             data-text="2615 se 125th ave #4, portland, or 97236 fox cats allowed, small dogs allowed">
+      <a class="photo " href="https://fox.appfolio.com/listings/detail/47264f99-2d2b-4aaa-a18c-35d3adfa37c1" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/fox/images/625b5ab2-33a2-4a84-a68c-07dd44908f27/medium.jpg" alt="2615 SE 125th Ave #4, Portland, OR 97236" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,395<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 900 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=2615+SE+125th+Ave+%234%2C+Portland%2C+OR+97236" target="_blank" rel="noopener">2615 SE 125th Ave #4, Portland, OR 97236</a></div>
+        <div class="meta">
+          <div><b>Company:</b> Fox</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://fox.appfolio.com/listings/detail/47264f99-2d2b-4aaa-a18c-35d3adfa37c1" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="lebb74b0dc9" data-rent="1595" data-beds="2" data-baths="1.5"
+             data-new="0" data-house="1"
+             data-text="522 ne 56th ave., portland, or 97213 corerealtors cats allowed, dogs allowed">
+      <a class="photo " href="https://corerealtors.appfolio.com/listings/detail/67b8b657-946f-4576-a23f-ae9458235505" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/corerealtors/images/3c6417f3-8eda-4103-b0e6-37759c6aecf4/medium.jpg" alt="522 NE 56th Ave., Portland, OR 97213" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,595<span>/mo</span></div>
+        <div class="facts">2 bd · 1.5 ba · 1,000 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=522+NE+56th+Ave.%2C+Portland%2C+OR+97213" target="_blank" rel="noopener">522 NE 56th Ave., Portland, OR 97213</a></div>
+        <div class="meta">
+          <div><b>Company:</b> CoreRealtors</div>
+          <div><b>Available:</b> 11/4/26</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://corerealtors.appfolio.com/listings/detail/67b8b657-946f-4576-a23f-ae9458235505" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l3ea38a09c8" data-rent="1595" data-beds="2" data-baths="2"
+             data-new="0" data-house="1"
+             data-text="19378 nw mahama way, apt c, portland, or 97229 thealpinegroup pet friendly: up to two pets are considered with an additional $25/month pet rent (per pet) and $500 deposit (per pet).">
+      <a class="photo " href="https://www.alpinepdx.com/portland-homes-for-rent#rentvine-unit-588" target="_blank" rel="noopener">
+        <img src="https://cdn.rentvine.com/alpinepdx/properties/515/images/2be6c5956ad976c7659085329a7da/large.jpeg" alt="19378 NW Mahama Way, Apt C, Portland, OR 97229" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,595<span>/mo</span></div>
+        <div class="facts">2 bd · 2 ba · 980 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=19378+NW+Mahama+Way%2C+Apt+C%2C+Portland%2C+OR+97229" target="_blank" rel="noopener">19378 NW Mahama Way, Apt C, Portland, OR 97229</a></div>
+        <div class="meta">
+          <div><b>Company:</b> TheAlpineGroup</div>
+          <div><b>Available:</b> 2026-10-21</div>
+          <div class="pets"><b>Pets:</b> Pet Friendly: Up to two pets are considered with an additional $25/month pet rent (per pet) and $500 deposit (per pet).</div>
+        </div>
+        <a class="btn" href="https://www.alpinepdx.com/portland-homes-for-rent#rentvine-unit-588" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l06b7e6f8ec" data-rent="1645" data-beds="2" data-baths="1"
+             data-new="0" data-house="0"
+             data-text="149 se 30th place #upper unit, portland, or 97214 ppirentals cats allowed, dogs allowed">
+      <a class="photo " href="https://performance.appfolio.com/listings/detail/8500ae91-c411-44a3-8d90-b5ac30b830bd" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/performance/images/6c114670-a802-4e85-82ee-8cfbdced98ee/medium.jpg" alt="149 SE 30th Place #Upper Unit, Portland, OR 97214" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,645<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 800 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=149+SE+30th+Place+%23Upper+Unit%2C+Portland%2C+OR+97214" target="_blank" rel="noopener">149 SE 30th Place #Upper Unit, Portland, OR 97214</a></div>
+        <div class="meta">
+          <div><b>Company:</b> PPIRentals</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://performance.appfolio.com/listings/detail/8500ae91-c411-44a3-8d90-b5ac30b830bd" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l9add89f99d" data-rent="1645" data-beds="2" data-baths="1.5"
+             data-new="0" data-house="1"
+             data-text="6919 n ida ave, portland, or 97203 fox cats allowed, dogs allowed">
+      <a class="photo " href="https://fox.appfolio.com/listings/detail/d8121efc-bad1-493b-a700-3b545ad092ac" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/fox/images/af56683e-dd6a-4ae9-8f4c-ff80944b4cca/medium.jpg" alt="6919 N Ida Ave, Portland, OR 97203" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,645<span>/mo</span></div>
+        <div class="facts">2 bd · 1.5 ba · 987 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=6919+N+Ida+Ave%2C+Portland%2C+OR+97203" target="_blank" rel="noopener">6919 N Ida Ave, Portland, OR 97203</a></div>
+        <div class="meta">
+          <div><b>Company:</b> Fox</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://fox.appfolio.com/listings/detail/d8121efc-bad1-493b-a700-3b545ad092ac" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="lf28b6dc213" data-rent="1650" data-beds="2" data-baths="1.5"
+             data-new="0" data-house="1"
+             data-text="242 se 106th ave - a, portland, or 97216-2884 uptownpm cats allowed, small dogs allowed">
+      <a class="photo " href="https://uptownproperties.appfolio.com/listings/detail/4c33db18-e018-458b-aea4-4fe2f1395dd2" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/uptownproperties/images/a21029eb-19f5-4416-8581-c41ef6378e14/medium.jpeg" alt="242 SE 106th Ave - A, Portland, OR 97216-2884" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,650<span>/mo</span></div>
+        <div class="facts">2 bd · 1.5 ba · 1,000 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=242+SE+106th+Ave+-+A%2C+Portland%2C+OR+97216-2884" target="_blank" rel="noopener">242 SE 106th Ave - A, Portland, OR 97216-2884</a></div>
+        <div class="meta">
+          <div><b>Company:</b> UptownPM</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://uptownproperties.appfolio.com/listings/detail/4c33db18-e018-458b-aea4-4fe2f1395dd2" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l860775cd7d" data-rent="1695" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="7956 sw 46th ave, #1, portland, or 97219 corerealtors cats allowed, small dogs allowed">
+      <a class="photo " href="https://corerealtors.appfolio.com/listings/detail/076c0093-4257-4f82-b84b-e37a78c2979d" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/corerealtors/images/932c43bf-2241-4cf8-8780-6a4beee9a0c2/medium.jpeg" alt="7956 SW 46th Ave, #1, Portland, OR 97219" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,695<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 800 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=7956+SW+46th+Ave%2C+%231%2C+Portland%2C+OR+97219" target="_blank" rel="noopener">7956 SW 46th Ave, #1, Portland, OR 97219</a></div>
+        <div class="meta">
+          <div><b>Company:</b> CoreRealtors</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://corerealtors.appfolio.com/listings/detail/076c0093-4257-4f82-b84b-e37a78c2979d" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l4bc7bb55b1" data-rent="1699" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="5853 sw oleson road , portland, or 97225 propmhomes cats allowed, dogs allowed">
+      <a class="photo " href="https://propmhomes.appfolio.com/listings/detail/791e46e9-47ce-48b0-9f79-82138e6576f8" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/propmhomes/images/99f35fd1-4d24-41c8-92b0-589ca670ffc2/medium.jpg" alt="5853 SW Oleson Road , Portland, OR 97225" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,699<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 750 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=5853+SW+Oleson+Road+%2C+Portland%2C+OR+97225" target="_blank" rel="noopener">5853 SW Oleson Road , Portland, OR 97225</a></div>
+        <div class="meta">
+          <div><b>Company:</b> PropMHomes</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://propmhomes.appfolio.com/listings/detail/791e46e9-47ce-48b0-9f79-82138e6576f8" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l838da93bfb" data-rent="1750" data-beds="2" data-baths="1.5"
+             data-new="0" data-house="1"
+             data-text="5505 ne 12th ave, portland, or 97211 rmspdx cats allowed, dogs not allowed">
+      <a class="photo " href="https://rmspdx.appfolio.com/listings/detail/33633724-b77d-4bc3-93ca-e14f582eafc1" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/rmspdx/images/c9c08cc9-ed60-4f6e-afbb-284bbe224df9/medium.jpg" alt="5505 NE 12th Ave, Portland, OR 97211" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,750<span>/mo</span></div>
+        <div class="facts">2 bd · 1.5 ba · 1,000 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=5505+NE+12th+Ave%2C+Portland%2C+OR+97211" target="_blank" rel="noopener">5505 NE 12th Ave, Portland, OR 97211</a></div>
+        <div class="meta">
+          <div><b>Company:</b> RMSPDX</div>
+          <div><b>Available:</b> 11/5/26</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs not allowed</div>
+        </div>
+        <a class="btn" href="https://rmspdx.appfolio.com/listings/detail/33633724-b77d-4bc3-93ca-e14f582eafc1" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l4455d1c9d4" data-rent="1799" data-beds="2" data-baths="1.5"
+             data-new="0" data-house="0"
+             data-text="2338 se 89th ave - unit c, portland, or 97216 peakassetmanagement cats allowed, dogs allowed">
+      <a class="photo " href="https://peakam.appfolio.com/listings/detail/3a5ab7ae-8751-40f1-a337-3a5b2f080810" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/peakam/images/55abda80-bd29-4784-8291-727886fa38df/medium.jpg" alt="2338 SE 89th Ave - Unit C, Portland, OR 97216" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,799<span>/mo</span></div>
+        <div class="facts">2 bd · 1.5 ba · 800 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=2338+SE+89th+Ave+-+Unit+C%2C+Portland%2C+OR+97216" target="_blank" rel="noopener">2338 SE 89th Ave - Unit C, Portland, OR 97216</a></div>
+        <div class="meta">
+          <div><b>Company:</b> PeakAssetManagement</div>
+          <div><b>Available:</b> 11/1/26</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://peakam.appfolio.com/listings/detail/3a5ab7ae-8751-40f1-a337-3a5b2f080810" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l2528f8569b" data-rent="1845" data-beds="2" data-baths="1.5"
+             data-new="0" data-house="1"
+             data-text="6611 sw canyon ln, #5, portland, or 97225 portlandpropertymanagement cats allowed, dogs allowed">
+      <a class="photo " href="https://portlandpm.appfolio.com/listings/detail/cadc2549-6b81-4d04-a93e-5d0ea0dbbe58" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/portlandpm/images/140de430-8935-482f-9591-e353250a3478/medium.jpg" alt="6611 SW Canyon Ln, #5, Portland, OR 97225" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,845<span>/mo</span></div>
+        <div class="facts">2 bd · 1.5 ba · 1,100 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=6611+SW+Canyon+Ln%2C+%235%2C+Portland%2C+OR+97225" target="_blank" rel="noopener">6611 SW Canyon Ln, #5, Portland, OR 97225</a></div>
+        <div class="meta">
+          <div><b>Company:</b> PortlandPropertyManagement</div>
+          <div><b>Available:</b> 11/19/26</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://portlandpm.appfolio.com/listings/detail/cadc2549-6b81-4d04-a93e-5d0ea0dbbe58" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="lbae74eb7c8" data-rent="1895" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="68 ne monroe ave., portland, or 97212 gridpropertymanagement cats allowed, small dogs allowed">
+      <a class="photo " href="https://gridpm.appfolio.com/listings/detail/a97d16a5-e86c-44ca-9115-f52889c381e1" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/gridpm/images/9a80188d-d335-4316-b602-2872eda18557/medium.jpg" alt="68 NE Monroe Ave., Portland, OR 97212" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,895<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 720 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=68+NE+Monroe+Ave.%2C+Portland%2C+OR+97212" target="_blank" rel="noopener">68 NE Monroe Ave., Portland, OR 97212</a></div>
+        <div class="meta">
+          <div><b>Company:</b> GridPropertyManagement</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://gridpm.appfolio.com/listings/detail/a97d16a5-e86c-44ca-9115-f52889c381e1" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l52ef55c4a0" data-rent="1899" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="5855 sw oleson road , portland, or 97225 propmhomes cats allowed, dogs allowed">
+      <a class="photo " href="https://propmhomes.appfolio.com/listings/detail/9b1ca427-364b-4d20-809a-27568954822e" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/propmhomes/images/5d3e2adc-acaa-4d14-9e06-c96b53df5665/medium.jpg" alt="5855 SW Oleson Road , Portland, OR 97225" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,899<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 750 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=5855+SW+Oleson+Road+%2C+Portland%2C+OR+97225" target="_blank" rel="noopener">5855 SW Oleson Road , Portland, OR 97225</a></div>
+        <div class="meta">
+          <div><b>Company:</b> PropMHomes</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://propmhomes.appfolio.com/listings/detail/9b1ca427-364b-4d20-809a-27568954822e" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l220e47d25a" data-rent="1950" data-beds="2" data-baths="1"
+             data-new="0" data-house="0"
+             data-text="2606 se pine street - lower unit, portland, or 97214 portlandpropertymanagement cats allowed, dogs allowed">
+      <a class="photo " href="https://portlandpm.appfolio.com/listings/detail/4c0f5b4f-e129-4deb-8f89-e9479e1369d7" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/portlandpm/images/542ec0b5-0aa0-4bfe-b6ac-1f1f1f4dbe74/medium.jpg" alt="2606 SE Pine Street - Lower Unit, Portland, OR 97214" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,950<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 700 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=2606+SE+Pine+Street+-+Lower+Unit%2C+Portland%2C+OR+97214" target="_blank" rel="noopener">2606 SE Pine Street - Lower Unit, Portland, OR 97214</a></div>
+        <div class="meta">
+          <div><b>Company:</b> PortlandPropertyManagement</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://portlandpm.appfolio.com/listings/detail/4c0f5b4f-e129-4deb-8f89-e9479e1369d7" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="lc66ac63435" data-rent="1965" data-beds="3" data-baths="2.5"
+             data-new="0" data-house="1"
+             data-text="16962 ne halsey street, portland, or 97230 onyx cats allowed, small dogs allowed">
+      <a class="photo " href="https://onyx.appfolio.com/listings/detail/42c015b6-f7b8-4433-bc26-a9e7af12256f" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/onyx/images/d81a94b8-2c43-4aad-9931-c33baff0f8dc/medium.jpg" alt="16962 NE Halsey Street, Portland, OR 97230" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,965<span>/mo</span></div>
+        <div class="facts">3 bd · 2.5 ba · 1,500 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=16962+NE+Halsey+Street%2C+Portland%2C+OR+97230" target="_blank" rel="noopener">16962 NE Halsey Street, Portland, OR 97230</a></div>
+        <div class="meta">
+          <div><b>Company:</b> Onyx</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://onyx.appfolio.com/listings/detail/42c015b6-f7b8-4433-bc26-a9e7af12256f" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l3692ffa803" data-rent="1975" data-beds="3" data-baths="2.5"
+             data-new="0" data-house="1"
+             data-text="16970 ne halsey street , portland, or 97230 onyx cats allowed, small dogs allowed">
+      <a class="photo " href="https://onyx.appfolio.com/listings/detail/3e00bff2-0b43-41f6-8f03-d13cf25d05d7" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/onyx/images/596a3f0c-cc11-4eee-9eba-9035818bec3e/medium.jpg" alt="16970 NE Halsey Street , Portland, OR 97230" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,975<span>/mo</span></div>
+        <div class="facts">3 bd · 2.5 ba · 1,500 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=16970+NE+Halsey+Street+%2C+Portland%2C+OR+97230" target="_blank" rel="noopener">16970 NE Halsey Street , Portland, OR 97230</a></div>
+        <div class="meta">
+          <div><b>Company:</b> Onyx</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://onyx.appfolio.com/listings/detail/3e00bff2-0b43-41f6-8f03-d13cf25d05d7" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l3ee39933ec" data-rent="1995" data-beds="2" data-baths="1"
+             data-new="0" data-house="0"
+             data-text="5270 ne 30th ave or 97211 - unit b, portland, or 97211 realpropertymanagementor005 cats allowed, dogs allowed">
+      <a class="photo " href="https://rpmor005.appfolio.com/listings/detail/ff861408-7ce0-4dff-9c95-ecfb7dec2d81" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/rpmor005/images/8e315021-0b9d-4530-91d1-2ad0d3c2b31d/medium.jpeg" alt="5270 NE 30th Ave OR 97211 - Unit B, Portland, OR 97211" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"></div>
+      </a>
+      <div class="body">
+        <div class="rent">$1,995<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 884 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=5270+NE+30th+Ave+OR+97211+-+Unit+B%2C+Portland%2C+OR+97211" target="_blank" rel="noopener">5270 NE 30th Ave OR 97211 - Unit B, Portland, OR 97211</a></div>
+        <div class="meta">
+          <div><b>Company:</b> RealPropertyManagementOR005</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://rpmor005.appfolio.com/listings/detail/ff861408-7ce0-4dff-9c95-ecfb7dec2d81" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l7bdb287794" data-rent="2095" data-beds="3" data-baths="2.5"
+             data-new="0" data-house="0"
+             data-text="6114 se 128th ave. - unit 2, portland, or 97236 portlandrentalproperties cats allowed, dogs allowed">
+      <a class="photo " href="https://portlandrentalproperties.appfolio.com/listings/detail/083a4b1e-9a7a-404c-9347-881b024a0920" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/portlandrentalproperties/images/52ef9d31-52e1-4ed3-85cf-12584eef9cc2/medium.jpg" alt="6114 SE 128th Ave. - Unit 2, Portland, OR 97236" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"></div>
+      </a>
+      <div class="body">
+        <div class="rent">$2,095<span>/mo</span></div>
+        <div class="facts">3 bd · 2.5 ba · 1,415 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=6114+SE+128th+Ave.+-+Unit+2%2C+Portland%2C+OR+97236" target="_blank" rel="noopener">6114 SE 128th Ave. - Unit 2, Portland, OR 97236</a></div>
+        <div class="meta">
+          <div><b>Company:</b> PortlandRentalProperties</div>
+          <div><b>Available:</b> 11/5/26</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://portlandrentalproperties.appfolio.com/listings/detail/083a4b1e-9a7a-404c-9347-881b024a0920" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l34844f9874" data-rent="2095" data-beds="3" data-baths="3.5"
+             data-new="0" data-house="0"
+             data-text="15075 se powell blvd #18, portland, or 97236 tmgoregon cats allowed, small dogs allowed">
+      <a class="photo " href="https://tmgoregon.appfolio.com/listings/detail/dc825f3b-0c91-4adc-ba21-43a59d6c9858" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/tmgoregon/images/25d8e7f5-7da9-4388-b266-72165a498a8b/medium.jpg" alt="15075 SE Powell Blvd #18, Portland, OR 97236" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"></div>
+      </a>
+      <div class="body">
+        <div class="rent">$2,095<span>/mo</span></div>
+        <div class="facts">3 bd · 3.5 ba · 1,500 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=15075+SE+Powell+Blvd+%2318%2C+Portland%2C+OR+97236" target="_blank" rel="noopener">15075 SE Powell Blvd #18, Portland, OR 97236</a></div>
+        <div class="meta">
+          <div><b>Company:</b> TMGOregon</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://tmgoregon.appfolio.com/listings/detail/dc825f3b-0c91-4adc-ba21-43a59d6c9858" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="lae76df816f" data-rent="2095" data-beds="2" data-baths="1"
+             data-new="0" data-house="1"
+             data-text="3954 se grant st, apt 4, portland, or 97214 irentpdx cats allowed, dogs allowed">
+      <a class="photo " href="https://irentpdx.appfolio.com/listings/detail/ef501ff2-61bd-436c-afdd-af03fe3ed197" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/palisades/images/e0854b33-f70e-4898-bc8f-80c61d46b3c2/medium.jpg" alt="3954 SE Grant St, Apt 4, Portland, OR 97214" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$2,095<span>/mo</span></div>
+        <div class="facts">2 bd · 1 ba · 1,274 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=3954+SE+Grant+St%2C+Apt+4%2C+Portland%2C+OR+97214" target="_blank" rel="noopener">3954 SE Grant St, Apt 4, Portland, OR 97214</a></div>
+        <div class="meta">
+          <div><b>Company:</b> iRentPDX</div>
+          <div><b>Available:</b> 12/19/26</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://irentpdx.appfolio.com/listings/detail/ef501ff2-61bd-436c-afdd-af03fe3ed197" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="lab44b41998" data-rent="2195" data-beds="2" data-baths="1.5"
+             data-new="0" data-house="1"
+             data-text="4814 se 62nd ave. , portland, or 97206 greenbridge cats allowed, dogs allowed">
+      <a class="photo " href="https://greenbridge.appfolio.com/listings/detail/1ffd5510-ee25-432a-bc16-c5137da7b5d7" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/greenbridge/images/8b254c70-c1e1-4d1f-b88d-9103de85edd0/medium.jpg" alt="4814 SE 62nd Ave. , Portland, OR 97206" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$2,195<span>/mo</span></div>
+        <div class="facts">2 bd · 1.5 ba · 805 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=4814+SE+62nd+Ave.+%2C+Portland%2C+OR+97206" target="_blank" rel="noopener">4814 SE 62nd Ave. , Portland, OR 97206</a></div>
+        <div class="meta">
+          <div><b>Company:</b> Greenbridge</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Dogs allowed</div>
+        </div>
+        <a class="btn" href="https://greenbridge.appfolio.com/listings/detail/1ffd5510-ee25-432a-bc16-c5137da7b5d7" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+
+    <article class="card" id="l5e0a6b1cdb" data-rent="2195" data-beds="3" data-baths="2.5"
+             data-new="0" data-house="1"
+             data-text="5254 se 73rd ave, portland, or 97206 gordonproperties cats allowed, small dogs allowed">
+      <a class="photo " href="https://gordonproperties.appfolio.com/listings/detail/23110698-b9cf-477a-b308-8df04d61dd58" target="_blank" rel="noopener">
+        <img src="https://images.cdn.appfolio.com/gordonproperties/images/998d57c8-6222-4bbb-b6d7-3f7464ff2262/medium.jpg" alt="5254 SE 73rd Ave, Portland, OR 97206" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove();">
+        <div class="badges"><span class="badge house">No unit #</span></div>
+      </a>
+      <div class="body">
+        <div class="rent">$2,195<span>/mo</span></div>
+        <div class="facts">3 bd · 2.5 ba · 1,408 sqft</div>
+        <div class="address"><a href="https://www.google.com/maps/search/?api=1&amp;query=5254+SE+73rd+Ave%2C+Portland%2C+OR+97206" target="_blank" rel="noopener">5254 SE 73rd Ave, Portland, OR 97206</a></div>
+        <div class="meta">
+          <div><b>Company:</b> GordonProperties</div>
+          <div><b>Available:</b> NOW</div>
+          <div class="pets"><b>Pets:</b> Cats allowed, Small dogs allowed</div>
+        </div>
+        <a class="btn" href="https://gordonproperties.appfolio.com/listings/detail/23110698-b9cf-477a-b308-8df04d61dd58" target="_blank" rel="noopener">View listing →</a>
+      </div>
+    </article>
+    </div>
+  </section>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const grids = [...document.querySelectorAll('.grid')];
+  function apply() {
+    const q = $('q').value.trim().toLowerCase();
+    const maxRent = parseFloat($('maxRent').value) || Infinity;
+    const minBeds = parseFloat($('minBeds').value) || 0;
+    const houseOnly = $('houseOnly').checked;
+    grids.forEach(g => {
+      const cards = [...g.querySelectorAll('.card')];
+      let shown = 0;
+      cards.forEach(c => {
+        const d = c.dataset;
+        const ok = (!q || d.text.includes(q)) && (+d.rent <= maxRent) && (+d.beds >= minBeds)
+                && (!houseOnly || d.house === '1');
+        c.style.display = ok ? '' : 'none';
+        if (ok) shown++;
+      });
+      $('count-' + g.id.slice(5)).textContent =
+        cards.length ? (shown === cards.length ? `(${shown})` : `(showing ${shown} of ${cards.length})`) : '(0)';
+    });
+  }
+  function sort() {
+    const key = {
+      'rent-asc':  (a, b) => (+a.dataset.rent || 1e9) - (+b.dataset.rent || 1e9),
+      'rent-desc': (a, b) => +b.dataset.rent - +a.dataset.rent,
+      'beds-desc': (a, b) => +b.dataset.beds - +a.dataset.beds || +a.dataset.rent - +b.dataset.rent,
+    }[$('sort').value];
+    grids.forEach(g => [...g.querySelectorAll('.card')].sort(key).forEach(c => g.appendChild(c)));
+  }
+  ['q','maxRent','minBeds','houseOnly'].forEach(id => $(id).addEventListener('input', apply));
+  ['q','maxRent','minBeds','houseOnly'].forEach(id => $(id).addEventListener('input', () => drawMap(false)));
+
+  // ---- Map ----
+  const POINTS = [{"id": "l65d8ee8e11", "lat": 45.4874109, "lng": -122.7286645, "rent": 1345.0, "beds": 2.0, "cost": "$1,345", "bb": "2 bd / 1 ba", "addr": "5011 SW Beaverton Hillsdale Hwy Apt C, Portland, OR 97221", "img": "https://images.cdn.appfolio.com/uptownproperties/images/33d7a269-db12-43b1-bc4d-a5663f663c6c/medium.jpg", "url": "https://uptownproperties.appfolio.com/listings/detail/8ddfe767-5fb0-4be4-afdd-f5291c0545d0", "isNew": false}, {"id": "l73559c1f50", "lat": 45.4863794, "lng": -122.5798939, "rent": 1349.0, "beds": 2.0, "cost": "$1,349", "bb": "2 bd / 1 ba", "addr": "8110 SE Raymond St. - Unit A, Portland, OR 97206", "img": "https://images.cdn.appfolio.com/peakam/images/e5f3a7fa-6bc1-4e9f-996a-b6f76c0d9d38/medium.jpeg", "url": "https://peakam.appfolio.com/listings/detail/e823a38e-783d-4fa1-89aa-7485db61d04d", "isNew": false}, {"id": "l1a82db6f72", "lat": 45.4960625, "lng": -122.5402566, "rent": 1350.0, "beds": 2.0, "cost": "$1,350", "bb": "2 bd / 1 ba", "addr": "3548 SE 119th Ave #C, Portland, OR 97266", "img": "https://images.cdn.appfolio.com/rmspdx/images/fb18c879-528a-49a4-b78e-6c6aefabc418/medium.jpg", "url": "https://rmspdx.appfolio.com/listings/detail/fbcd1082-4d81-4374-810b-38f68effb1f8", "isNew": false}, {"id": "ld9fb7823bf", "lat": 45.4949943, "lng": -122.4953971, "rent": 1395.0, "beds": 2.0, "cost": "$1,395", "bb": "2 bd / 1 ba", "addr": "3809 SE 164th Avenue, Portland, OR 97236", "img": "https://images.cdn.appfolio.com/rentportlandhomesprofessionals/images/377236b4-f94a-466d-97bd-40d7cea581e6/medium.jpg", "url": "https://rentportlandhomesprofessionals.appfolio.com/listings/detail/ab4393d0-b617-465d-a038-71f4cf73cebf", "isNew": false}, {"id": "l075b74aaa8", "lat": 45.503151, "lng": -122.5351767, "rent": 1395.0, "beds": 2.0, "cost": "$1,395", "bb": "2 bd / 1 ba", "addr": "2615 SE 125th Ave #4, Portland, OR 97236", "img": "https://images.cdn.appfolio.com/fox/images/625b5ab2-33a2-4a84-a68c-07dd44908f27/medium.jpg", "url": "https://fox.appfolio.com/listings/detail/47264f99-2d2b-4aaa-a18c-35d3adfa37c1", "isNew": false}, {"id": "lebb74b0dc9", "lat": 45.5269013, "lng": -122.6059069, "rent": 1595.0, "beds": 2.0, "cost": "$1,595", "bb": "2 bd / 1.5 ba", "addr": "522 NE 56th Ave., Portland, OR 97213", "img": "https://images.cdn.appfolio.com/corerealtors/images/3c6417f3-8eda-4103-b0e6-37759c6aecf4/medium.jpg", "url": "https://corerealtors.appfolio.com/listings/detail/67b8b657-946f-4576-a23f-ae9458235505", "isNew": false}, {"id": "l3ea38a09c8", "lat": 45.5460505, "lng": -122.8768215, "rent": 1595.0, "beds": 2.0, "cost": "$1,595", "bb": "2 bd / 2 ba", "addr": "19378 NW Mahama Way, Apt C, Portland, OR 97229", "img": "https://cdn.rentvine.com/alpinepdx/properties/515/images/2be6c5956ad976c7659085329a7da/large.jpeg", "url": "https://www.alpinepdx.com/portland-homes-for-rent#rentvine-unit-588", "isNew": false}, {"id": "l06b7e6f8ec", "lat": 45.5213708, "lng": -122.6341033, "rent": 1645.0, "beds": 2.0, "cost": "$1,645", "bb": "2 bd / 1 ba", "addr": "149 SE 30th Place #Upper Unit, Portland, OR 97214", "img": "https://images.cdn.appfolio.com/performance/images/6c114670-a802-4e85-82ee-8cfbdced98ee/medium.jpg", "url": "https://performance.appfolio.com/listings/detail/8500ae91-c411-44a3-8d90-b5ac30b830bd", "isNew": false}, {"id": "l9add89f99d", "lat": 45.5826092, "lng": -122.7417921, "rent": 1645.0, "beds": 2.0, "cost": "$1,645", "bb": "2 bd / 1.5 ba", "addr": "6919 N Ida Ave, Portland, OR 97203", "img": "https://images.cdn.appfolio.com/fox/images/af56683e-dd6a-4ae9-8f4c-ff80944b4cca/medium.jpg", "url": "https://fox.appfolio.com/listings/detail/d8121efc-bad1-493b-a700-3b545ad092ac", "isNew": false}, {"id": "lf28b6dc213", "lat": 45.52045, "lng": -122.5537835, "rent": 1650.0, "beds": 2.0, "cost": "$1,650", "bb": "2 bd / 1.5 ba", "addr": "242 SE 106th Ave - A, Portland, OR 97216-2884", "img": "https://images.cdn.appfolio.com/uptownproperties/images/a21029eb-19f5-4416-8581-c41ef6378e14/medium.jpeg", "url": "https://uptownproperties.appfolio.com/listings/detail/4c33db18-e018-458b-aea4-4fe2f1395dd2", "isNew": false}, {"id": "l860775cd7d", "lat": 45.467139, "lng": -122.7237119, "rent": 1695.0, "beds": 2.0, "cost": "$1,695", "bb": "2 bd / 1 ba", "addr": "7956 SW 46th Ave, #1, Portland, OR 97219", "img": "https://images.cdn.appfolio.com/corerealtors/images/932c43bf-2241-4cf8-8780-6a4beee9a0c2/medium.jpeg", "url": "https://corerealtors.appfolio.com/listings/detail/076c0093-4257-4f82-b84b-e37a78c2979d", "isNew": false}, {"id": "l4bc7bb55b1", "lat": 45.4778687, "lng": -122.7473859, "rent": 1699.0, "beds": 2.0, "cost": "$1,699", "bb": "2 bd / 1 ba", "addr": "5853 SW Oleson Road , Portland, OR 97225", "img": "https://images.cdn.appfolio.com/propmhomes/images/99f35fd1-4d24-41c8-92b0-589ca670ffc2/medium.jpg", "url": "https://propmhomes.appfolio.com/listings/detail/791e46e9-47ce-48b0-9f79-82138e6576f8", "isNew": false}, {"id": "l838da93bfb", "lat": 45.5628813, "lng": -122.6533362, "rent": 1750.0, "beds": 2.0, "cost": "$1,750", "bb": "2 bd / 1.5 ba", "addr": "5505 NE 12th Ave, Portland, OR 97211", "img": "https://images.cdn.appfolio.com/rmspdx/images/c9c08cc9-ed60-4f6e-afbb-284bbe224df9/medium.jpg", "url": "https://rmspdx.appfolio.com/listings/detail/33633724-b77d-4bc3-93ca-e14f582eafc1", "isNew": false}, {"id": "l4455d1c9d4", "lat": 45.505644, "lng": -122.5715604, "rent": 1799.0, "beds": 2.0, "cost": "$1,799", "bb": "2 bd / 1.5 ba", "addr": "2338 SE 89th Ave - Unit C, Portland, OR 97216", "img": "https://images.cdn.appfolio.com/peakam/images/55abda80-bd29-4784-8291-727886fa38df/medium.jpg", "url": "https://peakam.appfolio.com/listings/detail/3a5ab7ae-8751-40f1-a337-3a5b2f080810", "isNew": false}, {"id": "l2528f8569b", "lat": 45.5055363, "lng": -122.7458028, "rent": 1845.0, "beds": 2.0, "cost": "$1,845", "bb": "2 bd / 1.5 ba", "addr": "6611 SW Canyon Ln, #5, Portland, OR 97225", "img": "https://images.cdn.appfolio.com/portlandpm/images/140de430-8935-482f-9591-e353250a3478/medium.jpg", "url": "https://portlandpm.appfolio.com/listings/detail/cadc2549-6b81-4d04-a93e-5d0ea0dbbe58", "isNew": false}, {"id": "lbae74eb7c8", "lat": 45.5451554, "lng": -122.6649577, "rent": 1895.0, "beds": 2.0, "cost": "$1,895", "bb": "2 bd / 1 ba", "addr": "68 NE Monroe Ave., Portland, OR 97212", "img": "https://images.cdn.appfolio.com/gridpm/images/9a80188d-d335-4316-b602-2872eda18557/medium.jpg", "url": "https://gridpm.appfolio.com/listings/detail/a97d16a5-e86c-44ca-9115-f52889c381e1", "isNew": false}, {"id": "l52ef55c4a0", "lat": 45.4780338, "lng": -122.7472683, "rent": 1899.0, "beds": 2.0, "cost": "$1,899", "bb": "2 bd / 1 ba", "addr": "5855 SW Oleson Road , Portland, OR 97225", "img": "https://images.cdn.appfolio.com/propmhomes/images/5d3e2adc-acaa-4d14-9e06-c96b53df5665/medium.jpg", "url": "https://propmhomes.appfolio.com/listings/detail/9b1ca427-364b-4d20-809a-27568954822e", "isNew": false}, {"id": "l220e47d25a", "lat": 45.5206008, "lng": -122.6390924, "rent": 1950.0, "beds": 2.0, "cost": "$1,950", "bb": "2 bd / 1 ba", "addr": "2606 SE Pine Street - Lower Unit, Portland, OR 97214", "img": "https://images.cdn.appfolio.com/portlandpm/images/542ec0b5-0aa0-4bfe-b6ac-1f1f1f4dbe74/medium.jpg", "url": "https://portlandpm.appfolio.com/listings/detail/4c0f5b4f-e129-4deb-8f89-e9479e1369d7", "isNew": false}, {"id": "lc66ac63435", "lat": 45.5342707, "lng": -122.4884207, "rent": 1965.0, "beds": 3.0, "cost": "$1,965", "bb": "3 bd / 2.5 ba", "addr": "16962 NE Halsey Street, Portland, OR 97230", "img": "https://images.cdn.appfolio.com/onyx/images/d81a94b8-2c43-4aad-9931-c33baff0f8dc/medium.jpg", "url": "https://onyx.appfolio.com/listings/detail/42c015b6-f7b8-4433-bc26-a9e7af12256f", "isNew": false}, {"id": "l3692ffa803", "lat": 45.5342707, "lng": -122.4884207, "rent": 1975.0, "beds": 3.0, "cost": "$1,975", "bb": "3 bd / 2.5 ba", "addr": "16970 NE Halsey Street , Portland, OR 97230", "img": "https://images.cdn.appfolio.com/onyx/images/596a3f0c-cc11-4eee-9eba-9035818bec3e/medium.jpg", "url": "https://onyx.appfolio.com/listings/detail/3e00bff2-0b43-41f6-8f03-d13cf25d05d7", "isNew": false}, {"id": "l3ee39933ec", "lat": 45.5613477, "lng": -122.6346118, "rent": 1995.0, "beds": 2.0, "cost": "$1,995", "bb": "2 bd / 1 ba", "addr": "5270 NE 30th Ave OR 97211 - Unit B, Portland, OR 97211", "img": "https://images.cdn.appfolio.com/rpmor005/images/8e315021-0b9d-4530-91d1-2ad0d3c2b31d/medium.jpeg", "url": "https://rpmor005.appfolio.com/listings/detail/ff861408-7ce0-4dff-9c95-ecfb7dec2d81", "isNew": false}, {"id": "l7bdb287794", "lat": 45.4779806, "lng": -122.531727, "rent": 2095.0, "beds": 3.0, "cost": "$2,095", "bb": "3 bd / 2.5 ba", "addr": "6114 SE 128th Ave. - Unit 2, Portland, OR 97236", "img": "https://images.cdn.appfolio.com/portlandrentalproperties/images/52ef9d31-52e1-4ed3-85cf-12584eef9cc2/medium.jpg", "url": "https://portlandrentalproperties.appfolio.com/listings/detail/083a4b1e-9a7a-404c-9347-881b024a0920", "isNew": false}, {"id": "l34844f9874", "lat": 45.4975005, "lng": -122.5079757, "rent": 2095.0, "beds": 3.0, "cost": "$2,095", "bb": "3 bd / 3.5 ba", "addr": "15075 SE Powell Blvd #18, Portland, OR 97236", "img": "https://images.cdn.appfolio.com/tmgoregon/images/25d8e7f5-7da9-4388-b266-72165a498a8b/medium.jpg", "url": "https://tmgoregon.appfolio.com/listings/detail/dc825f3b-0c91-4adc-ba21-43a59d6c9858", "isNew": false}, {"id": "lae76df816f", "lat": 45.5074308, "lng": -122.6215363, "rent": 2095.0, "beds": 2.0, "cost": "$2,095", "bb": "2 bd / 1 ba", "addr": "3954 SE Grant St, Apt 4, Portland, OR 97214", "img": "https://images.cdn.appfolio.com/palisades/images/e0854b33-f70e-4898-bc8f-80c61d46b3c2/medium.jpg", "url": "https://irentpdx.appfolio.com/listings/detail/ef501ff2-61bd-436c-afdd-af03fe3ed197", "isNew": false}, {"id": "lab44b41998", "lat": 45.4879518, "lng": -122.5988291, "rent": 2195.0, "beds": 2.0, "cost": "$2,195", "bb": "2 bd / 1.5 ba", "addr": "4814 SE 62nd Ave. , Portland, OR 97206", "img": "https://images.cdn.appfolio.com/greenbridge/images/8b254c70-c1e1-4d1f-b88d-9103de85edd0/medium.jpg", "url": "https://greenbridge.appfolio.com/listings/detail/1ffd5510-ee25-432a-bc16-c5137da7b5d7", "isNew": false}, {"id": "l5e0a6b1cdb", "lat": 45.4848173, "lng": -122.5877484, "rent": 2195.0, "beds": 3.0, "cost": "$2,195", "bb": "3 bd / 2.5 ba", "addr": "5254 SE 73rd Ave, Portland, OR 97206", "img": "https://images.cdn.appfolio.com/gordonproperties/images/998d57c8-6222-4bbb-b6d7-3f7464ff2262/medium.jpg", "url": "https://gordonproperties.appfolio.com/listings/detail/23110698-b9cf-477a-b308-8df04d61dd58", "isNew": false}];
+  let mapMode = 'all', map = null, layer = null;
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+  function visible(p) {
+    if (mapMode === 'new' && !p.isNew) return false;
+    const el = document.getElementById(p.id);   // respect the card filters (search, rent, beds, no unit #)
+    return !el || el.style.display !== 'none';
+  }
+  function drawMap(fit) {
+    if (!map) return;
+    layer.clearLayers();
+    const shown = POINTS.filter(visible);
+    shown.forEach(p => {
+      const m = L.circleMarker([p.lat, p.lng], {
+        radius: p.isNew ? 8 : 6, weight: 2, color: '#fff',
+        fillColor: p.isNew ? '#d9480f' : '#0b5d66', fillOpacity: .9,
+      });
+      m.bindPopup(`<div class="pop">${p.img ? `<img src="${esc(p.img)}">` : ''}
+        <b>${esc(p.cost)}</b>${p.isNew ? '<span class="new">NEW</span>' : ''}<br>${esc(p.bb)}<br>${esc(p.addr)}<br>
+        <a href="${esc(p.url)}" target="_blank" rel="noopener">View listing →</a> ·
+        <a href="#" onclick="jumpTo('${p.id}');return false;">Show card</a></div>`);
+      m.bindTooltip(`${esc(p.cost)} · ${esc(p.bb)}`);
+      m.addTo(layer);
+    });
+    if (fit && shown.length) map.fitBounds(L.latLngBounds(shown.map(p => [p.lat, p.lng])), { padding: [30, 30], maxZoom: 14 });
+  }
+  function jumpTo(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 2000);
+  }
+  function setMode(mode) {
+    mapMode = mode;
+    $('mapNew').classList.toggle('on', mode === 'new');
+    $('mapAll').classList.toggle('on', mode === 'all');
+    drawMap(true);
+  }
+  $('mapNew').addEventListener('click', () => setMode('new'));
+  $('mapAll').addEventListener('click', () => setMode('all'));
+  if (window.L) {
+    map = L.map('map', { scrollWheelZoom: false }).setView([45.52, -122.65], 11);
+    // Tile providers that work with no API key from a file:// page (verified Oct 2026).
+    // tile.openstreetmap.org (403, usage policy) and CARTO (API key required) do NOT.
+    // If the current provider keeps failing, fall through to the next one.
+    const PROVIDERS = [
+      { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+         opts: { maxZoom: 19, attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, USGS, NGA, EPA, USDA, NPS' } },
+      { url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+         opts: { maxZoom: 17, subdomains: 'abc', attribution: 'Map data &copy; OpenStreetMap contributors, SRTM | Style &copy; OpenTopoMap (CC-BY-SA)' } },
+    ];
+    let providerIdx = 0, tiles = null, tileErrors = 0;
+    function useProvider(i) {
+      if (tiles) map.removeLayer(tiles);
+      providerIdx = i; tileErrors = 0;
+      tiles = L.tileLayer(PROVIDERS[i].url, PROVIDERS[i].opts).addTo(map);
+      tiles.on('tileerror', () => {
+        if (++tileErrors >= 4 && providerIdx + 1 < PROVIDERS.length) useProvider(providerIdx + 1);
+      });
+      tiles.on('tileload', () => { tileErrors = 0; });
+    }
+    useProvider(0);
+    layer = L.layerGroup().addTo(map);
+    map.on('click', () => map.scrollWheelZoom.enable());
+    drawMap(true);
+  } else {
+    $('map').innerHTML = '<div class="empty">Map library could not load (offline?).</div>';
+  }
+  $('sort').addEventListener('change', () => { sort(); apply(); });
+  apply();
+</script>
+</body>
+</html>
